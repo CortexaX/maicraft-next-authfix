@@ -327,6 +327,17 @@ export function configureServices(container: Container): void {
     return new PromptManager();
   });
 
+  // PromptOverrideManager (单例)
+  container.registerSingleton(ServiceKeys.PromptOverrideManager, c => {
+    const { createPromptOverrideManager } = require('@/core/agent/communication/promptOverrideManager');
+    const { getDefaultOverrideTemplates } = require('@/core/agent/communication/templates/overrideTemplates');
+
+    // 使用默认的覆盖模板配置
+    const overrideTemplates = getDefaultOverrideTemplates();
+
+    return createPromptOverrideManager(overrideTemplates);
+  });
+
   // PlaceBlockUtils (单例)
   container.registerSingleton(ServiceKeys.PlaceBlockUtils, c => {
     const { PlaceBlockUtils } = require('@/utils/PlaceBlockUtils');

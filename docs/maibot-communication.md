@@ -316,6 +316,238 @@ MaiBot 可以批量接收决策记忆并进行分析：
 
 MaiBot 可以分析成功率并给出改进建议。
 
+## 提示词覆盖功能
+
+maicraft-next 支持通过 MaiBot 通信机制向 MaiBot 发送自定义提示词，覆盖 MaiBot 的默认提示词配置。这个功能允许 maicraft-next 根据需要动态调整 MaiBot 的行为和回复风格。
+
+### 功能概述
+
+- **主动覆盖**：maicraft-next 主动发送覆盖提示词给 MaiBot，而不是被 MaiBot 覆盖
+- **消息级覆盖**：每次发送记忆消息时都会携带覆盖的提示词
+- **灵活配置**：支持在配置文件中灵活配置覆盖规则
+- **运行时管理**：支持动态启用/禁用和管理覆盖模板
+
+### 配置
+
+**提示词覆盖配置现在直接在代码中定义，无需配置文件。**
+
+覆盖模板按照功能划分在不同的文件中定义：
+
+- `src/core/agent/communication/templates/systemPrompt.ts` - 系统级提示词
+- `src/core/agent/communication/templates/chatResponse.ts` - 聊天回复提示词
+- `src/core/agent/communication/templates/performanceAnalysis.ts` - 性能分析提示词
+- `src/core/agent/communication/templates/taskGuidance.ts` - 任务指导提示词
+
+每个模板文件都包含该提示词的完整定义，例如 `systemPrompt.ts`：
+
+```typescript
+export const systemPrompt = {
+  name: 'system_prompt',
+  content: '你是一个专业的Minecraft助手，专门负责分析游戏数据并提供建设性建议。请用简洁明了的语言回复用户关于游戏的问题。',
+  description: '系统级提示词，定义AI助手的核心角色和行为准则'
+} as const;
+```
+
+这些模板在 `overrideTemplates.ts` 中被组合成完整的配置。如需修改特定提示词，请直接编辑对应的模板文件。
+
+### 工作原理
+
+#### 消息携带机制
+
+当 MaiBot 通信启用且提示词覆盖功能开启时，maicraft-next 发送的每条消息都会自动携带覆盖的提示词信息：
+
+```typescript
+// 发送的消息结构
+{
+  message_info: {
+    template_info: {
+      template_items: {
+        "system_prompt": "你是一个专业的Minecraft助手...",
+        "chat_response": "基于玩家的游戏行为..."
+      },
+      template_name: {
+        "system_prompt": "系统级提示词...",
+        "chat_response": "聊天回复模板..."
+      },
+      template_default: false  // 标记为非默认，启用覆盖
+    }
+  },
+  message_segment: { /* 实际消息内容 */ }
+}
+```
+
+#### MaiBot 处理流程
+
+MaiBot 收到消息后会：
+1. 检查 `template_info.template_default` 是否为 `false`
+2. 如果是，则启用覆盖机制
+3. 使用 `global_prompt_manager.async_message_scope()` 创建临时作用域
+4. 注册覆盖的提示词模板
+5. 在处理该消息时优先使用覆盖的提示词
+
+### 使用示例
+
+#### 示例1：自定义助手角色
+
+```toml
+[prompt_override]
+enabled = true
+template_group_name = "custom_assistant"
+
+[prompt_override.override_templates]
+system_prompt = "你是一个严格的Minecraft老师，玩家做错时要严厉批评，做对时要表扬。回复要简短有力。"
+```
+
+#### 示例2：添加专业术语
+
+```toml
+[prompt_override.override_templates]
+technical_response = "使用专业Minecraft术语回复：方块ID、合成配方、红石电路等。避免口语化表达。"
+```
+
+#### 示例3：情感化回复
+
+```toml
+[prompt_override.override_templates]
+emotional_response = "在回复中加入适当的表情符号和情感表达，让回复更有感染力。"
+```
+
+### 配置验证
+
+系统会对配置进行验证，确保：
+- `enabled = true` 时必须有有效的 `override_templates`
+- 模板名称不能为空
+- 模板内容不能为空
+- 模板描述是可选的，但如果提供必须对应有效的模板
+
+### 运行时管理
+
+#### 通过依赖注入访问
+
+```typescript
+import { container } from '@/core/di/bootstrap';
+import { ServiceKeys } from '@/core/di/ServiceKeys';
+
+const overrideManager = container.resolve(ServiceKeys.PromptOverrideManager);
+
+// 检查是否有覆盖模板
+if (overrideManager.hasTemplates()) {
+  // 获取所有覆盖模板
+  const templates = overrideManager.getAllTemplates();
+  console.log('当前覆盖模板:', templates);
+}
+```
+
+#### 动态修改配置
+
+```typescript
+// 注册新的覆盖模板
+overrideManager.registerTemplate(
+  'custom_template',
+  '这是自定义的提示词内容',
+  '自定义模板描述'
+);
+
+// 移除覆盖模板
+overrideManager.removeTemplate('old_template');
+```
+
+### 消息格式扩展
+
+发送给 MaiBot 的消息现在包含额外的模板信息：
+
+#### 思考记忆消息
+
+```
+[思考记忆]
+我在思考如何优化我的建筑
+上下文: {"goal":"建造房屋","mode":"creative"}
+---
+Template Override: system_prompt, custom_response
+```
+
+#### 决策记忆消息
+
+```
+[决策记忆] ✅
+意图: 建造房屋
+动作: {"actionType":"place_block","params":{"blockType":"planks"}}
+结果: success
+---
+Template Override: building_expert, construction_tips
+```
+
+### 故障排除
+
+#### 覆盖不生效
+
+1. **检查配置**
+   ```toml
+   [prompt_override]
+   enabled = true  # 确保启用
+   ```
+
+2. **验证模板**
+   - 确保 `override_templates` 不为空
+   - 检查模板名称和内容是否有效
+
+3. **检查 MaiBot 日志**
+   - 确认 MaiBot 正确处理了 `template_info`
+   - 查看是否有作用域创建和模板注册的日志
+
+#### 调试模式
+
+启用调试日志查看详细的覆盖过程：
+
+```toml
+[logging]
+level = "DEBUG"
+```
+
+### 性能影响
+
+- **内存占用**：覆盖模板存储在内存中，影响很小
+- **网络开销**：每次消息都会携带模板信息，增加少量网络流量
+- **处理开销**：MaiBot 端需要处理模板注册，增加少量处理时间
+
+### 最佳实践
+
+#### 1. 模板命名规范
+
+在代码中定义时，推荐使用驼峰命名：
+
+```typescript
+templates: {
+  systemRoleDefinition: "...",
+  chatResponseStyle: "...",
+  technicalExpertise: "..."
+}
+```
+
+#### 2. 模板内容优化
+
+推荐：简洁明确的指令
+
+```typescript
+customAssistant: "你是一个专业的Minecraft助手。请用技术术语回答问题，保持回复简洁。"
+```
+
+#### 3. 动态管理
+
+运行时可以动态添加或移除模板：
+
+```typescript
+// 添加新模板
+overrideManager.registerTemplate('newTemplate', '新模板内容', '描述');
+
+// 移除模板
+overrideManager.removeTemplate('oldTemplate');
+```
+
+#### 4. 版本控制
+
+建议将 bootstrap.ts 中的覆盖模板定义纳入版本控制，以便跟踪变化和回滚。
+
 ## 开发指南
 
 ### 扩展消息格式
@@ -347,11 +579,16 @@ private async handleMaibotReply(message: APIMessageBase): Promise<void> {
 
 - `src/core/agent/communication/MaiBotClient.ts` - 通信核心实现
 - `src/core/agent/communication/index.ts` - 通信模块导出
+- `src/core/agent/communication/promptOverrideManager.ts` - 提示词覆盖管理器
+- `src/core/agent/communication/templates/` - 提示词模板目录
+  - `overrideTemplates.ts` - 模板配置和导出
+  - `systemPrompt.ts` - 系统级提示词
+  - `chatResponse.ts` - 聊天回复提示词
+  - `performanceAnalysis.ts` - 性能分析提示词
+  - `taskGuidance.ts` - 任务指导提示词
 - `src/core/agent/memory/MemoryManager.ts` - 记忆管理集成
 - `src/core/di/ServiceKeys.ts` - 服务键定义
 - `src/core/di/bootstrap.ts` - 依赖注入配置
-- `src/utils/Config.ts` - 配置类型定义
-- `config-template.toml` - 配置模板
 
 ## 版本历史
 
@@ -361,6 +598,19 @@ private async handleMaibotReply(message: APIMessageBase): Promise<void> {
   - 支持接收 MaiBot 回复
   - 自动重连机制
   - 消息队列和批量发送
+
+- **v0.2.0** (2025-11-23)
+  - 添加提示词覆盖功能
+  - 覆盖配置直接在代码中定义
+  - 支持动态模板管理
+  - 简化配置，无需配置文件
+
+- **v0.3.0** (2025-11-23)
+  - 重构目录结构
+  - 将 `promptOverrideManager.ts` 移动到 `communication` 目录
+  - 将覆盖模板按功能划分到单独文件
+  - 创建 `systemPrompt.ts`, `chatResponse.ts`, `performanceAnalysis.ts`, `taskGuidance.ts`
+  - 改进模块组织，便于维护
 
 ## 许可证
 

@@ -55,6 +55,7 @@ export const ServiceKeys = {
 
   // 工具服务
   PromptManager: Symbol('PromptManager'),
+  PromptOverrideManager: Symbol('PromptOverrideManager'),
   PlaceBlockUtils: Symbol('PlaceBlockUtils'),
   MovementUtils: Symbol('MovementUtils'),
   CraftManager: Symbol('CraftManager'),
@@ -110,6 +111,7 @@ export interface ServiceTypeMap {
   [ServiceKeys.LoggerFactory]: import('@/utils/Logger').LoggerFactory;
   [ServiceKeys.ConfigLoader]: import('@/utils/Config').ConfigLoader;
   [ServiceKeys.PromptManager]: import('@/core/agent/prompt/prompt_manager').PromptManager;
+  [ServiceKeys.PromptOverrideManager]: import('@/core/agent/communication/promptOverrideManager').PromptOverrideManager;
   [ServiceKeys.PlaceBlockUtils]: import('@/utils/PlaceBlockUtils').PlaceBlockUtils;
   [ServiceKeys.MovementUtils]: import('@/utils/MovementUtils').MovementUtils;
   [ServiceKeys.CraftManager]: import('@/core/crafting/CraftManager').CraftManager;

@@ -7,10 +7,11 @@
  * 3. 将回复添加到思考记忆中
  */
 
-import { MessageClient, MessageBase, BaseMessageInfo, SenderInfo, UserInfo, GroupInfo, Seg } from '@changingself/maim-message-ts';
+import { MessageClient, MessageBase, BaseMessageInfo, SenderInfo, UserInfo, GroupInfo, Seg, TemplateInfo } from '@changingself/maim-message-ts';
 import { getLogger, type Logger } from '@/utils/Logger';
 import type { MaibotSection } from '@/utils/Config';
 import type { ThoughtEntry, DecisionEntry } from '../memory/types';
+import { getPromptOverrideManager } from './promptOverrideManager';
 
 /**
  * 记忆消息类型
@@ -81,7 +82,7 @@ export class MaiBotClient {
 
     // 注册消息处理器
     this.client.registerMessageHandler(async (message: any) => {
-      await this.handleMaibotReply(message);
+      await this.handleMaibotReply(MessageBase.fromDict(message));
     });
 
     // 启动客户端
@@ -227,6 +228,9 @@ export class MaiBotClient {
     const groupInfo = senderInfo.groupInfo || undefined;
     const userInfo = senderInfo.userInfo || undefined;
 
+    // 获取提示词覆盖信息
+    const templateInfo = this.getTemplateInfo();
+
     const messageInfo = new BaseMessageInfo(
       this.config.platform,
       `msg_${Date.now()}`,
@@ -234,7 +238,7 @@ export class MaiBotClient {
       groupInfo,
       userInfo,
       undefined, // formatInfo
-      undefined, // templateInfo
+      templateInfo, // templateInfo - 添加覆盖的提示词信息
       undefined, // additionalConfig
       senderInfo,
       undefined, // receiverInfo
@@ -243,7 +247,7 @@ export class MaiBotClient {
     const messageSegment = new Seg('text', messageContent);
     const message = new MessageBase(messageInfo, messageSegment, messageContent);
 
-    this.logger.info('💬 发送消息', { message: JSON.stringify(message.toDict()) });
+    this.logger.debug('💬 发送消息', { message: JSON.stringify(message.toDict()) });
 
     await this.client.sendMessage(message.toDict());
     this.logger.debug('✅ 已发送记忆消息', { type: memoryMessage.type });
@@ -264,6 +268,9 @@ export class MaiBotClient {
     const groupInfo = senderInfo.groupInfo || undefined;
     const userInfo = senderInfo.userInfo || undefined;
 
+    // 获取提示词覆盖信息
+    const templateInfo = this.getTemplateInfo();
+
     const messageInfo = new BaseMessageInfo(
       this.config.platform,
       `batch_${Date.now()}`,
@@ -271,7 +278,7 @@ export class MaiBotClient {
       groupInfo,
       userInfo,
       undefined, // formatInfo
-      undefined, // templateInfo
+      templateInfo, // templateInfo - 添加覆盖的提示词信息
       undefined, // additionalConfig
       senderInfo,
       undefined, // receiverInfo
@@ -324,6 +331,7 @@ export class MaiBotClient {
     try {
       // 提取文本内容
       let replyText = '';
+      this.logger.info('💬 收到 MaiBot 回复', { message: JSON.stringify(message.toDict()) });
 
       if (message.messageSegment) {
         const segment = message.messageSegment;
@@ -422,5 +430,29 @@ export class MaiBotClient {
    */
   getQueueLength(): number {
     return this.messageQueue.length;
+  }
+
+  /**
+   * 获取提示词覆盖信息
+   * 如果启用了覆盖功能且有覆盖模板，则返回 TemplateInfo，否则返回 undefined
+   */
+  private getTemplateInfo(): TemplateInfo | undefined {
+    const overrideManager = getPromptOverrideManager();
+    if (!overrideManager || !overrideManager.hasTemplates()) {
+      return undefined;
+    }
+
+    try {
+      const templateInfoData = overrideManager.generateTemplateInfo();
+      if (!templateInfoData) {
+        return undefined;
+      }
+
+      // 从字典数据创建 TemplateInfo 对象
+      return TemplateInfo.fromDict(templateInfoData);
+    } catch (error) {
+      this.logger.error('生成提示词覆盖信息失败', undefined, error as Error);
+      return undefined;
+    }
   }
 }
