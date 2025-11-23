@@ -4,10 +4,22 @@
  * 负责与 MaiBot 的 WebSocket 通信：
  * 1. 发送思考记忆和决策记忆给 MaiBot
  * 2. 接收 MaiBot 的回复
- * 3. 将回复添加到思考记忆中
+ * 3. 将回复添加到思考
+ * 记忆中
  */
 
-import { MessageClient, MessageBase, BaseMessageInfo, SenderInfo, UserInfo, GroupInfo, Seg, TemplateInfo } from '@changingself/maim-message-ts';
+import {
+  Router,
+  RouteConfig,
+  TargetConfig,
+  MessageBase,
+  BaseMessageInfo,
+  SenderInfo,
+  UserInfo,
+  GroupInfo,
+  Seg,
+  TemplateInfo,
+} from '@changingself/maim-message-ts';
 import { getLogger, type Logger } from '@/utils/Logger';
 import type { MaibotSection } from '@/utils/Config';
 import type { ThoughtEntry, DecisionEntry } from '../memory/types';
@@ -26,7 +38,7 @@ export interface MemoryMessage {
  * MaiBot 客户端
  */
 export class MaiBotClient {
-  private client: MessageClient | null = null;
+  private router: Router | null = null;
   private config: MaibotSection;
   private logger: Logger;
   private isConnected = false;
@@ -53,8 +65,11 @@ export class MaiBotClient {
       return;
     }
 
+    // 获取路由配置中的URL
+    const routeUrls = Object.values(this.config.routes).map(route => route.url);
+
     this.logger.info('🤖 正在连接到 MaiBot...', {
-      url: this.config.server_url,
+      urls: routeUrls,
       platform: this.config.platform,
     });
 
@@ -74,19 +89,28 @@ export class MaiBotClient {
    * 建立连接
    */
   private async connect(): Promise<void> {
-    // 创建消息客户端
-    this.client = new MessageClient();
+    // 从配置创建路由配置
+    const routeMap = new Map<string, TargetConfig>();
+    for (const [platform, config] of Object.entries(this.config.routes)) {
+      routeMap.set(platform, new TargetConfig(config.url, config.token, config.ssl_verify));
+    }
+    const routeConfig = new RouteConfig(routeMap);
 
-    // 连接到服务器
-    await this.client.connect(this.config.server_url, this.config.platform, this.config.api_key);
+    // 创建 Router
+    this.router = new Router(routeConfig);
 
     // 注册消息处理器
-    this.client.registerMessageHandler(async (message: any) => {
-      await this.handleMaibotReply(MessageBase.fromDict(message));
+    this.router.registerMessageHandler(async (message: MessageBase) => {
+      await this.handleMaibotReply(message);
     });
 
-    // 启动客户端
-    await this.client.run();
+    // 启动 Router（非阻塞）
+    setTimeout(() => {
+      this.router?.run().catch(error => {
+        this.logger.error('Router 运行失败', undefined, error as Error);
+      });
+    }, 0);
+
     this.isConnected = true;
     this.reconnectAttempts = 0;
   }
@@ -217,7 +241,7 @@ export class MaiBotClient {
    * 发送单条消息
    */
   private async sendMessage(memoryMessage: MemoryMessage): Promise<void> {
-    if (!this.client || !this.isConnected) {
+    if (!this.router || !this.isConnected) {
       return;
     }
 
@@ -245,11 +269,11 @@ export class MaiBotClient {
     );
 
     const messageSegment = new Seg('text', messageContent);
-    const message = new MessageBase(messageInfo, messageSegment, messageContent);
+    const message = new MessageBase(messageInfo, messageSegment);
 
     this.logger.debug('💬 发送消息', { message: JSON.stringify(message.toDict()) });
 
-    await this.client.sendMessage(message.toDict());
+    await this.router.sendMessage(message);
     this.logger.debug('✅ 已发送记忆消息', { type: memoryMessage.type });
   }
 
@@ -257,7 +281,7 @@ export class MaiBotClient {
    * 批量发送决策记忆
    */
   private async sendBatchDecisions(decisions: DecisionEntry[]): Promise<void> {
-    if (!this.client || !this.isConnected || decisions.length === 0) {
+    if (!this.router || !this.isConnected || decisions.length === 0) {
       return;
     }
 
@@ -287,7 +311,7 @@ export class MaiBotClient {
     const messageSegment = new Seg('text', messageContent);
     const message = new MessageBase(messageInfo, messageSegment);
 
-    await this.client.sendMessage(message.toDict());
+    await this.router.sendMessage(message);
     this.logger.info(`✅ 已批量发送 ${decisions.length} 条决策记忆`);
   }
 
@@ -404,14 +428,14 @@ export class MaiBotClient {
       this.reconnectTimer = undefined;
     }
 
-    // 关闭客户端
-    if (this.client) {
+    // 关闭 Router
+    if (this.router) {
       try {
-        await this.client.stop();
+        await this.router.stop();
       } catch (error) {
-        this.logger.error('关闭 MaiBot 客户端失败', undefined, error as Error);
+        this.logger.error('关闭 MaiBot Router 失败', undefined, error as Error);
       }
-      this.client = null;
+      this.router = null;
     }
 
     this.isConnected = false;

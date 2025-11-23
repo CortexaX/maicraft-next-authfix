@@ -103,13 +103,19 @@ export interface AdvancedSection {
 }
 
 /**
- * MaiBot 通信配置接口
+ * MaiBot 通信配置接口 (使用 Router)
  */
 export interface MaibotSection {
   enabled: boolean;
-  server_url: string;
-  api_key: string;
   platform: string;
+  routes: Record<
+    string,
+    {
+      url: string;
+      token?: string;
+      ssl_verify?: string;
+    }
+  >;
   reconnect: boolean;
   reconnect_delay: number;
   max_reconnect_attempts: number;
@@ -244,9 +250,21 @@ const AdvancedSectionSchema = z.object({
 
 const MaibotSectionSchema = z.object({
   enabled: z.boolean().default(false),
-  server_url: z.string().default('ws://localhost:18040/ws'),
-  api_key: z.string().default('maicraft_key'),
   platform: z.string().default('minecraft'),
+  routes: z
+    .record(
+      z.object({
+        url: z.string(),
+        token: z.string().optional(),
+        ssl_verify: z.string().optional(),
+      }),
+    )
+    .default({
+      maicraft: {
+        url: 'ws://localhost:18040/ws',
+        token: 'maicraft_key',
+      },
+    }),
   reconnect: z.boolean().default(true),
   reconnect_delay: z.number().positive().default(5000),
   max_reconnect_attempts: z.number().positive().default(10),
