@@ -39,6 +39,7 @@ export const ServiceKeys = {
   GoalPlanningManager: Symbol('GoalPlanningManager'),
   ModeManager: Symbol('ModeManager'),
   InterruptController: Symbol('InterruptController'),
+  MaiBotClient: Symbol('MaiBotClient'),
 
   // 决策循环
   MainDecisionLoop: Symbol('MainDecisionLoop'),
@@ -101,6 +102,7 @@ export interface ServiceTypeMap {
   [ServiceKeys.GoalPlanningManager]: import('@/core/agent/planning/GoalPlanningManager').GoalPlanningManager;
   [ServiceKeys.ModeManager]: import('@/core/agent/mode/ModeManager').ModeManager;
   [ServiceKeys.InterruptController]: import('@/core/agent/InterruptController').InterruptController;
+  [ServiceKeys.MaiBotClient]: import('@/core/agent/communication/MaiBotClient').MaiBotClient;
   [ServiceKeys.MainDecisionLoop]: import('@/core/agent/loop/MainDecisionLoop').MainDecisionLoop;
   [ServiceKeys.ChatLoop]: import('@/core/agent/loop/ChatLoop').ChatLoop;
   [ServiceKeys.StructuredOutputManager]: import('@/core/agent/structured/StructuredOutputManager').StructuredOutputManager;

@@ -11,6 +11,9 @@ importers:
       '@anthropic-ai/sdk':
         specifier: ^0.67.0
         version: 0.67.1(zod@3.25.76)
+      '@changingself/maim-message-ts':
+        specifier: ^0.1.2
+        version: 0.1.2
       jsonrepair:
         specifier: ^3.13.1
         version: 3.13.1
@@ -302,6 +305,10 @@ packages:
 
   '@bcoe/v8-coverage@0.2.3':
     resolution: {integrity: sha512-0hYQ8SB4Db5zvZB4axdMHGwEaQjkZzFjQiN9LVYvIFB2nSUHW9tYpxWriPrWDASIxiaXax83REcLxuSdnGPZtw==}
+
+  '@changingself/maim-message-ts@0.1.2':
+    resolution: {integrity: sha512-xFy6/J//gJMMkNBTZ5V4Tt1JbMW62jzBgSCXIGYffxjEo/PNUOkPzfMQneIWrupq2wzxB4U/WKGRWRnIm4foIA==}
+    engines: {node: '>=16.0.0'}
 
   '@esbuild/aix-ppc64@0.25.11':
     resolution: {integrity: sha512-Xt1dOL13m8u0WE8iplx9Ibbm+hFAO0GsU2P34UNoDGvZYkY8ifSiy6Zuc1lYxfG7svWE2fzqCUmFp5HCn51gJg==}
@@ -2589,6 +2596,13 @@ snapshots:
       '@babel/helper-validator-identifier': 7.27.1
 
   '@bcoe/v8-coverage@0.2.3': {}
+
+  '@changingself/maim-message-ts@0.1.2':
+    dependencies:
+      ws: 8.18.3
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@esbuild/aix-ppc64@0.25.11':
     optional: true

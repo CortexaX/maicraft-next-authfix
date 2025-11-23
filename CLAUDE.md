@@ -130,3 +130,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **持久化**：可选禁用持久化，避免大缓存序列化问题
 
 详细说明：查看 `docs/cache-optimization.md`
+
+### MaiBot 通信集成
+
+支持与 MaiBot 实时通信：
+
+- **发送记忆**：自动发送思考记忆和决策记忆给 MaiBot
+- **接收回复**：接收 MaiBot 的回复并添加到思考记忆
+- **消息队列**：内置队列和批量发送机制，避免过于频繁
+- **自动重连**：连接断开时自动重连
+- **可配置**：支持启用/禁用、发送频率、批量大小等配置
+
+详细说明：查看 `docs/maibot-communication.md`

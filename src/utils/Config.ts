@@ -103,6 +103,31 @@ export interface AdvancedSection {
 }
 
 /**
+ * MaiBot 通信配置接口
+ */
+export interface MaibotSection {
+  enabled: boolean;
+  server_url: string;
+  api_key: string;
+  platform: string;
+  reconnect: boolean;
+  reconnect_delay: number;
+  max_reconnect_attempts: number;
+  heartbeat_interval: number;
+  send_thought_memory: boolean;
+  send_decision_memory: boolean;
+  decision_memory_batch_size: number;
+  memory_send_interval: number;
+  // 群组信息配置
+  group_id?: string;
+  group_name?: string;
+  // 用户信息配置
+  user_id?: string;
+  user_name?: string;
+  user_displayname?: string;
+}
+
+/**
  * 深度可选类型
  */
 export type DeepPartial<T> = {
@@ -119,6 +144,7 @@ export interface AppConfig {
   agent: AgentSection;
   llm: import('../llm/types.js').LLMConfig;
   plugins: PluginsSection;
+  maibot: MaibotSection;
   advanced: AdvancedSection;
 }
 
@@ -216,6 +242,28 @@ const AdvancedSectionSchema = z.object({
   restricted_items: z.array(z.string()).default([]),
 });
 
+const MaibotSectionSchema = z.object({
+  enabled: z.boolean().default(false),
+  server_url: z.string().default('ws://localhost:18040/ws'),
+  api_key: z.string().default('maicraft_key'),
+  platform: z.string().default('minecraft'),
+  reconnect: z.boolean().default(true),
+  reconnect_delay: z.number().positive().default(5000),
+  max_reconnect_attempts: z.number().positive().default(10),
+  heartbeat_interval: z.number().positive().default(30000),
+  send_thought_memory: z.boolean().default(true),
+  send_decision_memory: z.boolean().default(true),
+  decision_memory_batch_size: z.number().positive().default(5),
+  memory_send_interval: z.number().positive().default(1000),
+  // 群组信息配置
+  group_id: z.string().optional(),
+  group_name: z.string().optional(),
+  // 用户信息配置
+  user_id: z.string().optional(),
+  user_name: z.string().optional(),
+  user_displayname: z.string().optional(),
+});
+
 const AppConfigSchema = z.object({
   app: AppSectionSchema,
   logging: LoggingSectionSchema,
@@ -223,6 +271,7 @@ const AppConfigSchema = z.object({
   agent: AgentSectionSchema,
   llm: LLMConfigSchema,
   plugins: PluginsSectionSchema,
+  maibot: MaibotSectionSchema,
   advanced: AdvancedSectionSchema,
 });
 

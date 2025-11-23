@@ -9,6 +9,7 @@ import { ConversationMemory } from './ConversationMemory';
 import { DecisionMemory } from './DecisionMemory';
 import { ExperienceMemory } from './ExperienceMemory';
 import type { MemoryStore, ThoughtEntry, ConversationEntry, DecisionEntry, ExperienceEntry, MemoryStats } from './types';
+import type { MaiBotClient } from '../communication/MaiBotClient';
 
 export class MemoryManager {
   private thoughts: ThoughtMemory;
@@ -22,6 +23,7 @@ export class MemoryManager {
   private logger: Logger;
   private webSocketServer?: any; // WebSocket服务器引用
   private botConfig?: any; // 机器人配置
+  private maiBotClient?: MaiBotClient; // MaiBot 客户端
 
   constructor() {
     this.logger = getLogger('MemoryManager');
@@ -62,6 +64,30 @@ export class MemoryManager {
   }
 
   /**
+   * 设置 MaiBot 客户端（由依赖注入系统调用）
+   */
+  setMaiBotClient(client: MaiBotClient): void {
+    this.maiBotClient = client;
+
+    // 设置回复回调：将 MaiBot 的回复添加到思考记忆中
+    client.setOnReplyCallback((reply: string) => {
+      this.recordThought(`[MaiBot回复] ${reply}`, {
+        source: 'maibot',
+        type: 'reply',
+      });
+    });
+
+    this.logger.info('🤖 MaiBot 客户端已连接到记忆管理器');
+  }
+
+  /**
+   * 获取 MaiBot 客户端
+   */
+  getMaiBotClient(): MaiBotClient | undefined {
+    return this.maiBotClient;
+  }
+
+  /**
    * 注册自定义记忆类型
    */
   registerMemoryStore<T>(name: string, store: MemoryStore<T>): void {
@@ -80,7 +106,7 @@ export class MemoryManager {
    * 记录思考
    */
   recordThought(content: string, context?: Record<string, any>): void {
-    const entry = {
+    const entry: ThoughtEntry = {
       id: this.generateId(),
       content,
       context,
@@ -88,7 +114,7 @@ export class MemoryManager {
     };
     this.thoughts.add(entry);
 
-    // 推送记忆更新
+    // 推送记忆更新到 WebSocket
     if (this.webSocketServer) {
       if (this.webSocketServer.memoryDataProvider) {
         this.webSocketServer.memoryDataProvider.pushMemory('thought', entry);
@@ -97,6 +123,11 @@ export class MemoryManager {
       }
     } else {
       this.logger.warn('❌ WebSocket服务器未设置，无法推送思考记忆');
+    }
+
+    // 发送给 MaiBot（如果不是来自 MaiBot 的回复）
+    if (this.maiBotClient && context?.source !== 'maibot') {
+      this.maiBotClient.sendThoughtMemory(entry);
     }
   }
 
@@ -124,7 +155,7 @@ export class MemoryManager {
    * 记录决策
    */
   recordDecision(intention: string, action: any, result: 'success' | 'failed' | 'interrupted', feedback?: string): void {
-    const entry = {
+    const entry: DecisionEntry = {
       id: this.generateId(),
       intention,
       action,
@@ -135,9 +166,14 @@ export class MemoryManager {
     this.decisions.add(entry);
     this.logger.debug(`🎯 记录决策: ${result} - ${intention}`);
 
-    // 推送记忆更新
+    // 推送记忆更新到 WebSocket
     if (this.webSocketServer?.memoryDataProvider) {
       this.webSocketServer.memoryDataProvider.pushMemory('decision', entry);
+    }
+
+    // 发送给 MaiBot
+    if (this.maiBotClient) {
+      this.maiBotClient.sendDecisionMemory(entry);
     }
   }
 

@@ -208,13 +208,34 @@ export function configureServices(container: Container): void {
 
   // ==================== 6. AI 代理系统 ====================
 
+  // MaiBotClient (单例)
+  container
+    .registerSingleton(ServiceKeys.MaiBotClient, c => {
+      const { MaiBotClient } = require('@/core/agent/communication/MaiBotClient');
+      const config = c.resolve<AppConfig>(ServiceKeys.Config);
+      return new MaiBotClient(config.maibot);
+    })
+    .withInitializer(ServiceKeys.MaiBotClient, async (client: any) => {
+      await client.start();
+    })
+    .withDisposer(ServiceKeys.MaiBotClient, async (client: any) => {
+      await client.stop();
+    });
+
   // MemoryManager (单例)
   container
-    .registerSingleton(ServiceKeys.MemoryManager, c => {
+    .registerSingleton(ServiceKeys.MemoryManager, async c => {
       const { MemoryManager } = require('@/core/agent/memory/MemoryManager');
       const config = c.resolve<AppConfig>(ServiceKeys.Config);
       const memory = new MemoryManager();
       memory.setBotConfig(config);
+
+      // 设置 MaiBot 客户端（如果启用）
+      if (config.maibot.enabled) {
+        const maibotClient = await c.resolveAsync(ServiceKeys.MaiBotClient);
+        memory.setMaiBotClient(maibotClient);
+      }
+
       return memory;
     })
     .withInitializer(ServiceKeys.MemoryManager, async (memory: any) => {

@@ -194,6 +194,30 @@ max_container_entries = 0 # 最大容器缓存条目数（0=无限制）
 block_expiration_time = 0     # 方块缓存过期时间（毫秒，0=永不过期）
 container_expiration_time = 0 # 容器缓存过期时间（毫秒，0=永不过期）
 
+[maibot]
+# MaiBot 通信配置
+enabled = false                       # 是否启用与 MaiBot 的通信
+server_url = "ws://localhost:8000/ws" # MaiBot WebSocket 服务器地址
+api_key = "maicraft_key"              # API 密钥
+platform = "maicraft"                 # 平台标识
+reconnect = true                      # 连接断开时是否自动重连
+reconnect_delay = 5000                # 重连延迟（毫秒）
+max_reconnect_attempts = 10           # 最大重连次数
+heartbeat_interval = 30000            # 心跳间隔（毫秒）
+send_thought_memory = true            # 是否发送思考记忆
+send_decision_memory = true           # 是否发送决策记忆
+decision_memory_batch_size = 5        # 决策记忆批量发送数量
+memory_send_interval = 1000           # 记忆发送间隔（毫秒，避免过于频繁）
+
+# 群组信息配置（可选，用于消息中的群组标识）
+group_id = ""   # 群组ID
+group_name = "" # 群组名称
+
+# 用户信息配置（可选，用于消息中的用户信息）
+user_id = "maicraft_bot"            # 用户ID
+user_name = "Maicraft AI"           # 用户名
+user_displayname = "Minecraft AI助手" # 用户显示名
+
 [advanced]
 # 高级配置
 hot_reload = true
