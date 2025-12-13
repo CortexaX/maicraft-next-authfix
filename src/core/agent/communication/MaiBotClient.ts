@@ -42,6 +42,7 @@ export class MaiBotClient {
   private config: MaibotSection;
   private logger: Logger;
   private isConnected = false;
+  private isShuttingDown = false;
   private reconnectTimer?: NodeJS.Timeout;
   private reconnectAttempts = 0;
   private messageQueue: MemoryMessage[] = [];
@@ -57,7 +58,7 @@ export class MaiBotClient {
   }
 
   /**
-   * 启动通信
+   * 启动通信（非阻塞，在后台运行）
    */
   async start(): Promise<void> {
     if (!this.config.enabled) {
@@ -68,20 +69,41 @@ export class MaiBotClient {
     // 获取路由配置中的URL
     const routeUrls = Object.values(this.config.routes).map(route => route.url);
 
-    this.logger.info('🤖 正在连接到 MaiBot...', {
+    this.logger.info('🤖 正在连接到 MaiBot（后台模式）...', {
       urls: routeUrls,
       platform: this.config.platform,
     });
 
+    // 在后台异步连接，不阻塞启动流程
+    this.connectInBackground().catch(error => {
+      this.logger.warn('⚠️ MaiBot 初始连接失败，将自动重试', {
+        error: error.message,
+        willRetry: this.config.reconnect,
+      });
+    });
+  }
+
+  /**
+   * 后台连接（不阻塞主流程）
+   */
+  private async connectInBackground(): Promise<void> {
     try {
       await this.connect();
       this.startSendTimer();
       this.logger.info('✅ 已连接到 MaiBot');
     } catch (error) {
-      this.logger.error('连接 MaiBot 失败', undefined, error as Error);
-      if (this.config.reconnect) {
+      this.logger.warn('⚠️ 连接 MaiBot 失败', {
+        error: (error as Error).message,
+        willRetry: this.config.reconnect,
+      });
+
+      // 如果启用了重连，自动安排重连
+      if (this.config.reconnect && !this.isShuttingDown) {
         this.scheduleReconnect();
       }
+
+      // ⚠️ 不要重新抛出错误！这样会导致 uncaughtException
+      // 连接失败是预期内的情况，不应该让应用崩溃
     }
   }
 
@@ -89,30 +111,84 @@ export class MaiBotClient {
    * 建立连接
    */
   private async connect(): Promise<void> {
-    // 从配置创建路由配置
-    const routeMap = new Map<string, TargetConfig>();
-    for (const [platform, config] of Object.entries(this.config.routes)) {
-      routeMap.set(platform, new TargetConfig(config.url, config.token, config.ssl_verify));
-    }
-    const routeConfig = new RouteConfig(routeMap);
+    try {
+      // 从配置创建路由配置
+      const routeMap = new Map<string, TargetConfig>();
+      for (const [platform, config] of Object.entries(this.config.routes)) {
+        routeMap.set(platform, new TargetConfig(config.url, config.token, config.ssl_verify));
+      }
+      const routeConfig = new RouteConfig(routeMap);
 
-    // 创建 Router
-    this.router = new Router(routeConfig);
+      // 创建 Router
+      this.router = new Router(routeConfig);
 
-    // 注册消息处理器
-    this.router.registerMessageHandler(async (message: MessageBase) => {
-      await this.handleMaibotReply(message);
-    });
+      // 如果 Router 继承自 EventEmitter，添加错误监听器
+      if (typeof (this.router as any).on === 'function') {
+        (this.router as any).on('error', (error: Error) => {
+          this.logger.warn('⚠️ Router 触发 error 事件', {
+            error: error.message,
+            willRetry: this.config.reconnect,
+          });
+          this.isConnected = false;
 
-    // 启动 Router（非阻塞）
-    setTimeout(() => {
-      this.router?.run().catch(error => {
-        this.logger.error('Router 运行失败', undefined, error as Error);
+          // 如果启用了重连，尝试重连
+          if (this.config.reconnect && !this.isShuttingDown) {
+            this.scheduleReconnect();
+          }
+        });
+      }
+
+      // 注册消息处理器
+      this.router.registerMessageHandler(async (message: MessageBase) => {
+        await this.handleMaibotReply(message);
       });
-    }, 0);
 
-    this.isConnected = true;
-    this.reconnectAttempts = 0;
+      // 启动 Router（非阻塞），使用 Promise 链确保错误被捕获
+      const runRouter = async () => {
+        try {
+          await this.router?.run();
+        } catch (error) {
+          this.logger.warn('⚠️ Router 运行失败', {
+            error: (error as Error).message,
+            willRetry: this.config.reconnect,
+          });
+          this.isConnected = false;
+
+          // 如果启用了重连，尝试重连
+          if (this.config.reconnect && !this.isShuttingDown) {
+            this.logger.info(`🔄 将在 ${this.config.reconnect_delay}ms 后尝试重连 MaiBot`);
+            this.scheduleReconnect();
+          }
+        }
+      };
+
+      // 使用 Promise.resolve() 让 Router 异步启动，确保错误在 Promise 链中被捕获
+      Promise.resolve()
+        .then(() => runRouter())
+        .catch(error => {
+          // 双重保护：确保任何未捕获的错误都被处理
+          this.logger.warn('⚠️ Router 启动过程中发生未预期的错误', {
+            error: (error as Error).message,
+          });
+          this.isConnected = false;
+
+          // 如果启用了重连，尝试重连
+          if (this.config.reconnect && !this.isShuttingDown) {
+            this.scheduleReconnect();
+          }
+        });
+
+      this.isConnected = true;
+      this.reconnectAttempts = 0;
+
+      this.logger.debug('Router 已创建，正在后台启动连接...');
+    } catch (error) {
+      this.logger.warn('⚠️ 创建 Router 失败', {
+        error: (error as Error).message,
+      });
+      this.isConnected = false;
+      throw error;
+    }
   }
 
   /**
@@ -390,22 +466,42 @@ export class MaiBotClient {
    * 计划重连
    */
   private scheduleReconnect(): void {
+    // 清除之前的重连定时器（如果有）
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = undefined;
+    }
+
     if (this.reconnectAttempts >= this.config.max_reconnect_attempts) {
-      this.logger.error('达到最大重连次数，停止重连');
+      this.logger.warn(`⚠️ 已达到最大重连次数 (${this.config.max_reconnect_attempts})，将不再自动重连`);
+      this.logger.info('💡 提示：如需重新连接 MaiBot，请重启程序');
       return;
     }
 
     this.reconnectAttempts++;
     const delay = this.config.reconnect_delay;
 
-    this.logger.info(`将在 ${delay}ms 后尝试重连 MaiBot (${this.reconnectAttempts}/${this.config.max_reconnect_attempts})`);
+    this.logger.info(`🔄 将在 ${delay}ms 后尝试重连 MaiBot (尝试 ${this.reconnectAttempts}/${this.config.max_reconnect_attempts})`);
 
     this.reconnectTimer = setTimeout(async () => {
+      if (this.isShuttingDown) {
+        this.logger.info('程序正在关闭，取消重连');
+        return;
+      }
+
+      this.logger.info(`🔄 正在尝试重连 MaiBot (第 ${this.reconnectAttempts} 次)...`);
+
       try {
         await this.connect();
+        this.startSendTimer();
         this.logger.info('✅ 重连 MaiBot 成功');
+        // 重置重连计数
+        this.reconnectAttempts = 0;
       } catch (error) {
-        this.logger.error('重连 MaiBot 失败', undefined, error as Error);
+        this.logger.warn(`⚠️ 重连 MaiBot 失败 (第 ${this.reconnectAttempts} 次)`, {
+          error: (error as Error).message,
+        });
+        // 继续尝试重连
         this.scheduleReconnect();
       }
     }, delay);
@@ -416,6 +512,9 @@ export class MaiBotClient {
    */
   async stop(): Promise<void> {
     this.logger.info('正在关闭 MaiBot 通信...');
+
+    // 设置关闭标志，防止重连
+    this.isShuttingDown = true;
 
     // 清除定时器
     if (this.sendTimer) {

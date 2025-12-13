@@ -81,13 +81,9 @@ class MaicraftNext {
       // 6. 初始化插件设置
       this.initializePluginSettings();
 
-      // 7. 启动 WebSocket 服务器
-      await this.container.resolveAsync<WebSocketServer>(ServiceKeys.WebSocketServer);
-      this.logger.info('✅ WebSocket服务器启动完成');
-
-      // 8. 启动 Agent 并连接 WebSocket
+      // 7. 启动 WebSocket 服务器和 Agent
+      const wsServer = await this.container.resolveAsync<WebSocketServer>(ServiceKeys.WebSocketServer);
       const agent = await this.container.resolveAsync<Agent>(ServiceKeys.Agent);
-      const wsServer = this.container.resolve<WebSocketServer>(ServiceKeys.WebSocketServer);
 
       // 连接 Agent 和 WebSocket 服务器
       agent.setWebSocketServer(wsServer);
@@ -372,6 +368,19 @@ class MaicraftNext {
 }
 
 /**
+ * 检查是否是 MaiBot 连接错误
+ * MaiBot 连接错误不应该导致应用崩溃
+ */
+function isMaiBotConnectionError(error: Error): boolean {
+  const errorObj = error as any;
+  const isAggregateError = error.name === 'AggregateError';
+  const isConnectionError = errorObj.code === 'ECONNREFUSED' || errorObj.code === 'ETIMEDOUT' || errorObj.code === 'ENOTFOUND';
+  const isNetworkStack = error.stack?.includes('internalConnectMultiple') || error.stack?.includes('afterConnectMultiple');
+
+  return isConnectionError && (isAggregateError && isNetworkStack) !== undefined;
+}
+
+/**
  * 主函数
  */
 async function main(): Promise<void> {
@@ -414,12 +423,20 @@ async function main(): Promise<void> {
 
   // 捕获未处理的异常
   process.on('uncaughtException', error => {
+    if (isMaiBotConnectionError(error)) {
+      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', undefined, error);
+      return;
+    }
     basicErrorLogger.error('未捕获的异常', undefined, error);
     app.shutdown().then(() => process.exit(1));
   });
 
   process.on('unhandledRejection', (reason, promise) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
+    if (isMaiBotConnectionError(err)) {
+      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', undefined, err);
+      return;
+    }
     basicErrorLogger.error('未处理的Promise拒绝', undefined, err);
     app.shutdown().then(() => process.exit(1));
   });

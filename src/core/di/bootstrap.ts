@@ -209,6 +209,7 @@ export function configureServices(container: Container): void {
   // ==================== 6. AI 代理系统 ====================
 
   // MaiBotClient (单例)
+  // 注意：MaiBotClient 会在后台异步连接，不会阻塞应用启动
   container
     .registerSingleton(ServiceKeys.MaiBotClient, c => {
       const { MaiBotClient } = require('@/core/agent/communication/MaiBotClient');
@@ -216,10 +217,16 @@ export function configureServices(container: Container): void {
       return new MaiBotClient(config.maibot);
     })
     .withInitializer(ServiceKeys.MaiBotClient, async (client: any) => {
+      // start() 方法已经是非阻塞的，会在后台连接
+      // 即使连接失败也不会抛出异常，而是自动重试
       await client.start();
     })
     .withDisposer(ServiceKeys.MaiBotClient, async (client: any) => {
-      await client.stop();
+      try {
+        await client.stop();
+      } catch (error) {
+        // 忽略停止时的错误
+      }
     });
 
   // MemoryManager (单例)
@@ -227,13 +234,19 @@ export function configureServices(container: Container): void {
     .registerSingleton(ServiceKeys.MemoryManager, async c => {
       const { MemoryManager } = require('@/core/agent/memory/MemoryManager');
       const config = c.resolve<AppConfig>(ServiceKeys.Config);
+      const logger = c.resolve<Logger>(ServiceKeys.Logger);
       const memory = new MemoryManager();
       memory.setBotConfig(config);
 
       // 设置 MaiBot 客户端（如果启用）
       if (config.maibot.enabled) {
-        const maibotClient = await c.resolveAsync(ServiceKeys.MaiBotClient);
-        memory.setMaiBotClient(maibotClient);
+        try {
+          const maibotClient = await c.resolveAsync(ServiceKeys.MaiBotClient);
+          memory.setMaiBotClient(maibotClient);
+        } catch (error) {
+          // MaiBot 客户端初始化失败，但不影响 MemoryManager 的正常工作
+          logger.warn('⚠️ MaiBot 客户端初始化失败，记忆管理器将在无 MaiBot 模式下运行', { error: (error as Error).message });
+        }
       }
 
       return memory;
