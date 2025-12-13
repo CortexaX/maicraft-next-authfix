@@ -143,15 +143,12 @@ export class PromptManager {
   }
 
   /**
-   * 根据模板名称和参数生成提示词（支持自动嵌套模板引用）
+   * 根据模板名称和参数生成提示词（支持1-2层嵌套模板引用）
    *
-   * 对应 Python 的 generate_prompt(template_name, **kwargs)
-   * 这是核心方法！
-   *
-   * 增强功能：
-   * - 自动识别 {template_name} 并替换为对应模板的内容
-   * - 支持递归嵌套模板引用
-   * - 防止循环引用
+   * 简化版本：
+   * - 只支持1-2层嵌套，符合实际使用需求
+   * - 简化的循环引用检测
+   * - 减少不必要的日志和验证
    */
   generatePrompt(templateName: string, params: Record<string, any>, visitedTemplates: Set<string> = new Set()): string {
     const template = this.getTemplate(templateName);
@@ -160,21 +157,18 @@ export class PromptManager {
       throw new Error(`模板 '${templateName}' 不存在`);
     }
 
-    // 检测循环引用
-    if (visitedTemplates.has(templateName)) {
-      throw new Error(`检测到循环引用: ${Array.from(visitedTemplates).join(' -> ')} -> ${templateName}`);
+    // 简化的循环引用检测（最多10层）
+    if (visitedTemplates.size > 10) {
+      const path = Array.from(visitedTemplates).join(' -> ');
+      throw new Error(`嵌套层次过深，可能存在循环引用: ${path} -> ${templateName}`);
     }
 
     // 标记当前模板为已访问
     const newVisited = new Set(visitedTemplates);
     newVisited.add(templateName);
 
-    // 扩展参数：自动解析嵌套模板引用
-    const expandedParams = this.expandNestedTemplates(params, newVisited);
-
-    // 格式化模板（使用扩展的参数和 manager 引用）
     try {
-      const result = this.formatWithNestedTemplates(template, expandedParams, newVisited);
+      const result = this.formatTemplate(template, params, newVisited);
       this.logger.debug(`成功生成提示词，模板: ${templateName}`);
 
       // 将提示词输出到文件
@@ -190,13 +184,12 @@ export class PromptManager {
   }
 
   /**
-   * 格式化模板，支持嵌套模板自动替换
+   * 格式化模板，支持嵌套模板自动替换（简化版）
    */
-  private formatWithNestedTemplates(template: PromptTemplate, params: Record<string, any>, visitedTemplates: Set<string>): string {
+  private formatTemplate(template: PromptTemplate, params: Record<string, any>, visitedTemplates: Set<string>): string {
     let result = template.template;
 
     // 提取所有 {param} 占位符
-    // 使用负向后顾断言和负向前瞻断言，避免匹配 {{ 和 }} 包围的内容
     const paramPattern = /(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)(?::[^}]+)?\}(?!\})/g;
     const placeholders = new Set<string>();
     let match;
@@ -215,27 +208,19 @@ export class PromptManager {
       const hasNonEmptyValue = paramValue !== undefined && paramValue !== null && paramValue !== '';
       const hasTemplate = this.templates.has(placeholder);
 
-      // 调试日志
-      this.logger.debug(
-        `🔍 处理占位符 '${placeholder}': paramExists=${paramExists}, hasTemplate=${hasTemplate}, paramValue=${JSON.stringify(paramValue)}`,
-      );
-
       if (hasTemplate) {
-        // ✅ 优先使用同名模板
+        // 优先使用同名模板
         if (hasNonEmptyValue) {
           // 存在同名模板但用户也提供了非空值，这是冲突
-          this.logger.warn(`⚠️ 参数 '${placeholder}' 的值被忽略，因为存在同名模板。` + `建议从参数中移除该字段，让系统自动生成。`);
+          this.logger.warn(`参数 '${placeholder}' 的值被忽略，因为存在同名模板，建议从参数中移除该字段`);
         }
         try {
           value = this.generatePrompt(placeholder, params, visitedTemplates);
-          this.logger.info(`✅ 自动生成嵌套模板: ${placeholder} (长度: ${value.length} 字符)`);
         } catch (error) {
-          // 自动生成失败，抛出更友好的错误
           throw new Error(`无法生成嵌套模板 '${placeholder}': ${error instanceof Error ? error.message : error}`);
         }
       } else if (paramExists) {
-        // 没有同名模板，使用参数值（允许空字符串 ''，例如 eat_action: ''）
-        this.logger.debug(`📝 使用参数值: ${placeholder} = ${paramValue === '' ? '(空字符串)' : JSON.stringify(paramValue)}`);
+        // 没有同名模板，使用参数值
         value = String(paramValue ?? '');
       } else {
         // 既没有同名模板，也没有提供参数
@@ -248,16 +233,6 @@ export class PromptManager {
     }
 
     return result;
-  }
-
-  /**
-   * 扩展嵌套模板引用（预处理）
-   *
-   * 为了性能优化，预先生成一些常用的嵌套模板
-   */
-  private expandNestedTemplates(params: Record<string, any>, visitedTemplates: Set<string>): Record<string, any> {
-    // 直接返回参数，实际的嵌套模板生成在 formatWithNestedTemplates 中动态进行
-    return { ...params };
   }
 
   /**

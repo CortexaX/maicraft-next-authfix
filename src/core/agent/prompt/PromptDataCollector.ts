@@ -9,7 +9,11 @@ import type { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator
 import { promptManager } from '@/core/agent/prompt';
 import type { EntityInfo, GameState } from '@/core/state/GameState';
 
-export interface BasicInfoData {
+/**
+ * 基础信息数据
+ * 包含所有游戏状态和基本信息的字段
+ */
+export interface BaseInfoData {
   bot_name: string;
   player_name: string;
   self_info: string;
@@ -27,49 +31,42 @@ export interface BasicInfoData {
   chat_str: string;
   mode: string;
   task: string;
-  basic_info?: string; // 可选，由外部生成
 }
 
-export interface DynamicActionData {
-  eat_action: string;
-  kill_mob_action: string;
-}
-
-export interface MemoryData {
-  failed_hint: string;
-  thinking_list: string;
-}
-
-export interface MainThinkingData {
-  // 嵌套模板（会自动生成）
-  role_description: string;
-  basic_info: string;
-
-  // 动作相关
+/**
+ * 动作相关数据
+ * 包含与动作提示相关的动态内容
+ */
+export interface ActionData {
   available_actions: string;
   eat_action: string;
   kill_mob_action: string;
+}
 
-  // 记忆和历史
+/**
+ * 记忆相关数据
+ * 包含思考和决策历史
+ */
+export interface MemoryData {
   failed_hint: string;
   thinking_list: string;
   judge_guidance: string;
+}
 
-  // 基础信息（用于嵌套模板）
-  bot_name: string;
-  player_name: string;
-  goal: string;
-  to_do_list: string;
-  self_status_info: string;
-  inventory_info: string;
-  position: string;
-  block_search_distance: number;
-  nearby_block_info: string;
-  container_search_distance: number;
-  container_cache_info: string;
-  entity_search_distance: number;
-  nearby_entities_info: string;
-  chat_str: string;
+/**
+ * 主思考数据
+ * 组合基础信息、动作数据和记忆数据
+ * 减少字段重复，使用组合模式
+ */
+export interface MainThinkingData {
+  // 嵌套模板（会自动生成，无需提供值）
+  role_description: string;
+  basic_info: string;
+
+  // 使用组合模式，减少字段重复
+  baseInfo: BaseInfoData;
+  actionData: ActionData;
+  memoryData: MemoryData;
 }
 
 export class PromptDataCollector {
@@ -85,7 +82,7 @@ export class PromptDataCollector {
   /**
    * 收集基础信息
    */
-  collectBasicInfo(): BasicInfoData {
+  collectBasicInfo(): BaseInfoData {
     const { gameState } = this.state.context;
     const { planningManager } = this.state;
 
@@ -113,7 +110,7 @@ export class PromptDataCollector {
   /**
    * 收集动态动作提示
    */
-  collectDynamicActions(): DynamicActionData {
+  collectDynamicActions(): ActionData {
     const { gameState } = this.state.context;
 
     return {
@@ -137,48 +134,36 @@ export class PromptDataCollector {
         includeThoughts: 3,
         includeDecisions: 8,
       }),
+      judge_guidance: '', // 将由collectAllData设置
     };
   }
 
   /**
    * 收集所有数据（用于 main_thinking）
    *
-   * 优化：利用自动嵌套模板引用，无需手动生成子模板
+   * 使用组合模式减少数据重复，简化结构
    * 提示词系统会自动识别并生成 role_description 和 basic_info
    */
   collectAllData(): MainThinkingData {
-    const basicInfo = this.collectBasicInfo();
-    const dynamicActions = this.collectDynamicActions();
+    const baseInfo = this.collectBasicInfo();
+    const actionData = this.collectDynamicActions();
     const memoryData = this.collectMemoryData();
+
+    // 添加available_actions到actionData
+    actionData.available_actions = this.actionPromptGenerator.generatePrompt();
+
+    // 添加judge_guidance到memoryData
+    memoryData.judge_guidance = this.getJudgeGuidance();
 
     return {
       // 嵌套模板（会自动生成，无需提供值）
       role_description: '',
       basic_info: '',
 
-      // 动作相关
-      available_actions: this.actionPromptGenerator.generatePrompt(),
-      ...dynamicActions,
-
-      // 记忆和历史
-      ...memoryData,
-      judge_guidance: this.getJudgeGuidance(),
-
-      // 基础参数（用于自动生成嵌套模板）
-      bot_name: basicInfo.bot_name,
-      player_name: basicInfo.player_name,
-      goal: basicInfo.goal,
-      to_do_list: basicInfo.to_do_list,
-      self_status_info: basicInfo.self_status_info,
-      inventory_info: basicInfo.inventory_info,
-      position: basicInfo.position,
-      block_search_distance: basicInfo.block_search_distance,
-      nearby_block_info: basicInfo.nearby_block_info,
-      container_search_distance: basicInfo.container_search_distance,
-      container_cache_info: basicInfo.container_cache_info,
-      entity_search_distance: basicInfo.entity_search_distance,
-      nearby_entities_info: basicInfo.nearby_entities_info,
-      chat_str: basicInfo.chat_str,
+      // 使用组合模式，避免字段重复
+      baseInfo,
+      actionData,
+      memoryData,
     };
   }
 

@@ -152,8 +152,17 @@ export class MainMode extends BaseMode {
     // 收集决策数据
     const promptData = await this.dataCollector!.collectAllData();
 
+    // 展开组合数据结构，保持与模板兼容
+    const expandedPromptData = {
+      ...promptData.baseInfo, // 展开基础信息
+      ...promptData.actionData, // 展开动作数据
+      ...promptData.memoryData, // 展开记忆数据
+      role_description: promptData.role_description,
+      basic_info: promptData.basic_info,
+    };
+
     // 生成提示词
-    const prompt = promptManager.generatePrompt('main_thinking', promptData);
+    const prompt = promptManager.generatePrompt('main_thinking', expandedPromptData);
 
     // 生成系统提示词，包含动作信息（传递上下文以启用动作过滤）
     const actionPromptGenerator = new ActionPromptGenerator(this.state!.context.executor);

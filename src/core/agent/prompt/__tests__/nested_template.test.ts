@@ -53,7 +53,7 @@ describe('嵌套模板引用', () => {
 
     expect(() => {
       manager.generatePrompt('template_a', {});
-    }).toThrow(/循环引用/);
+    }).toThrow(/嵌套层次过深/); // 更新错误消息，匹配简化后的实现
   });
 
   test('应该处理参数不足的嵌套模板', () => {

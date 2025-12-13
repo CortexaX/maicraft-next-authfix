@@ -2,6 +2,7 @@
  * 模板统一导出和初始化
  */
 
+// 导出所有模板初始化函数
 export { initBasicInfoTemplate } from './basic_info';
 export { initMainThinkingTemplate } from './main_thinking';
 export { initChatResponseTemplate } from './chat_response';
@@ -14,33 +15,49 @@ export { initExperienceSummaryTemplate } from './experience_summary';
 export { initPlanGenerationTemplate } from './plan_generation';
 export { initGoalGenerationTemplate } from './goal_generation';
 
+// 导入所有模板初始化函数（一次性）
+import {
+  initBasicInfoTemplate,
+  initMainThinkingTemplate,
+  initChatResponseTemplate,
+  initChatInitiateTemplate,
+  initTaskEvaluationTemplate,
+  initSystemPromptTemplates,
+  initFurnaceOperationTemplate,
+  initChestOperationTemplate,
+  initExperienceSummaryTemplate,
+  initPlanGenerationTemplate,
+  initGoalGenerationTemplate,
+} from './template_initializers';
+
 /**
  * 初始化所有核心模板
  *
  * 对应 maicraft 的 template.py 中的 init_templates()
  */
-import { initBasicInfoTemplate } from './basic_info';
-import { initMainThinkingTemplate } from './main_thinking';
-import { initChatResponseTemplate } from './chat_response';
-import { initChatInitiateTemplate } from './chat_initiate';
-import { initTaskEvaluationTemplate } from './task_evaluation';
-import { initSystemPromptTemplates } from './system_prompts';
-import { initFurnaceOperationTemplate } from './furnace_operation';
-import { initChestOperationTemplate } from './chest_operation';
-import { initExperienceSummaryTemplate } from './experience_summary';
-import { initPlanGenerationTemplate } from './plan_generation';
-import { initGoalGenerationTemplate } from './goal_generation';
-
 export function initAllCoreTemplates(): void {
-  initBasicInfoTemplate();
-  initMainThinkingTemplate();
-  initChatResponseTemplate();
-  initChatInitiateTemplate();
-  initTaskEvaluationTemplate();
-  initSystemPromptTemplates();
-  initFurnaceOperationTemplate();
-  initChestOperationTemplate();
-  initExperienceSummaryTemplate();
-  initPlanGenerationTemplate();
-  initGoalGenerationTemplate();
+  // 按类别分组初始化，提高可维护性
+  try {
+    // 基础模板
+    initBasicInfoTemplate();
+    initMainThinkingTemplate();
+    initSystemPromptTemplates();
+
+    // 功能模板
+    initTaskEvaluationTemplate();
+    initPlanGenerationTemplate();
+    initGoalGenerationTemplate();
+    initExperienceSummaryTemplate();
+
+    // 交互模板
+    initChatResponseTemplate();
+    initChatInitiateTemplate();
+
+    // 操作模板
+    initFurnaceOperationTemplate();
+    initChestOperationTemplate();
+  } catch (error) {
+    console.error('模板初始化失败:', error);
+    throw error;
+  }
 }
