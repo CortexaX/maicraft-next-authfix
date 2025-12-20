@@ -15,6 +15,7 @@ import { MainMode } from './modes/MainMode';
 import { CombatMode } from './modes/CombatMode';
 import { FurnaceMode } from './modes/FurnaceMode';
 import { ChestMode } from './modes/ChestMode';
+import { PlanningMode } from './modes/PlanningMode';
 
 export class ModeManager {
   private modes: Map<string, BaseMode> = new Map();
@@ -31,6 +32,7 @@ export class ModeManager {
   static readonly MODE_TYPES = {
     MAIN: 'main_mode',
     COMBAT: 'combat_mode',
+    PLANNING: 'planning_mode',
     FURNACE_GUI: 'furnace_gui',
     CHEST_GUI: 'chest_gui',
   } as const;
@@ -65,6 +67,10 @@ export class ModeManager {
     const combatMode = new CombatMode(this.context);
     combatMode.bindState(this.state);
     this.registerMode(combatMode);
+
+    const planningMode = new PlanningMode(this.context);
+    planningMode.bindState(this.state);
+    this.registerMode(planningMode);
 
     const furnaceMode = new FurnaceMode(this.context);
     furnaceMode.bindState(this.state);

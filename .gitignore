@@ -148,3 +148,5 @@ logs/
 config.toml
 
 data/
+
+.qoder/

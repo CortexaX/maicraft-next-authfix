@@ -8,10 +8,8 @@ import type { Logger } from '@/utils/Logger';
 import type { Bot } from 'mineflayer';
 import type { AppConfig as Config } from '@/utils/Config';
 import type { AgentState, AgentStatus, GameContext } from './types';
-import type { Goal } from './planning/Goal';
 import { InterruptController } from './InterruptController';
 import { MemoryManager } from './memory/MemoryManager';
-import { GoalPlanningManager } from './planning/GoalPlanningManager';
 import { ModeManager } from './mode/ModeManager';
 import { MainDecisionLoop } from './loop/MainDecisionLoop';
 import { ChatLoop } from './loop/ChatLoop';
@@ -47,7 +45,6 @@ export class Agent {
     llmManager: any,
     config: Config,
     memory: MemoryManager,
-    planningManager: GoalPlanningManager,
     modeManager: ModeManager,
     interrupt: InterruptController,
     logger?: Logger,
@@ -66,7 +63,6 @@ export class Agent {
       isRunning: false,
       context,
       modeManager,
-      planningManager,
       memory,
       llmManager: this.llmManager,
       interrupt,
@@ -76,16 +72,11 @@ export class Agent {
     // 绑定状态到 ModeManager
     this.state.modeManager.bindState(this.state);
 
-    // 设置规划管理器的目标完成回调
-    this.state.planningManager.setOnGoalCompleted((goal: Goal) => {
-      this.handleGoalCompletion(goal);
-    });
-
     // 创建决策循环（依赖 AgentState，在这里创建）
     this.mainLoop = new MainDecisionLoop(this.state, this.llmManager);
     this.chatLoop = new ChatLoop(this.state, this.llmManager);
 
-    // 初始化数据收集器（用于目标生成）
+    // 初始化数据收集器
     const actionPromptGenerator = new ActionPromptGenerator(this.executor);
     this.dataCollector = new PromptDataCollector(this.state, actionPromptGenerator);
 
@@ -126,13 +117,27 @@ export class Agent {
       // 初始化记忆系统
       await this.state.memory.initialize();
 
-      // 初始化规划系统
-      await this.state.planningManager.initialize();
+      // 加载目标和任务持久化数据
+      if (this.state.context.goalManager && this.state.context.taskManager) {
+        const { TrackerFactory } = await import('@/core/agent/planning/trackers/TrackerFactory');
+        const trackerFactory = new TrackerFactory();
 
-      // 如果配置中有目标但规划系统中没有，创建初始目标
-      if (this.state.goal && !this.state.planningManager.getCurrentGoal()) {
-        this.logger.info(`🎯 从配置创建初始目标: ${this.state.goal}`);
-        this.state.planningManager.createGoal(this.state.goal);
+        await this.state.context.goalManager.load('./data', trackerFactory);
+        await this.state.context.taskManager.load('./data', trackerFactory);
+
+        this.logger.info('✅ 目标和任务数据加载完成');
+      }
+
+      // 如果配置中有初始目标且当前无活动目标，创建初始目标
+      if (this.state.goal && this.state.context.goalManager) {
+        const goalManager = this.state.context.goalManager;
+        if (goalManager.getActiveGoals().length === 0) {
+          this.logger.info(`🎯 从配置创建初始目标: ${this.state.goal}`);
+          goalManager.addGoal({
+            content: this.state.goal,
+            priority: 5, // 初始目标优先级最高
+          });
+        }
       }
 
       // 注册所有模式
@@ -194,9 +199,6 @@ export class Agent {
     this.mainLoop.stop();
     this.chatLoop.stop();
 
-    // 停止规划系统
-    this.state.planningManager.stop();
-
     // 保存状态
     await this.saveState();
 
@@ -218,81 +220,20 @@ export class Agent {
   }
 
   /**
-   * 处理目标完成事件
+   * 处理目标完成事件（已废弃 - 新系统使用自动检测）
+   * 保留空方法以兼容旧代码引用
    */
-  private handleGoalCompletion(goal: Goal): void {
-    // 1. 记录目标完成事件到思考记忆
-    this.state.memory.recordThought(`成功完成了目标: ${goal.description}`, {
-      completedGoal: goal.description,
-      duration: Date.now() - goal.createdAt,
-      planCount: goal.planIds.length,
-    });
-
-    // 2. 触发"目标完成"事件通知
-    this.state.context.events.emit('goalCompleted', {
-      goal: {
-        id: goal.id,
-        description: goal.description,
-        completedAt: goal.completedAt,
-        duration: goal.completedAt ? goal.completedAt - goal.createdAt : 0,
-        planCount: goal.planIds.length,
-      },
-    });
-
-    // 3. 自动生成新目标
-    this.generateNewGoalAfterCompletion(goal);
+  private handleGoalCompletion(_goal: any): void {
+    // 新系统中目标完成由goalManager自动检测和记录
+    // LLM会在prompt中看到goal_completed_hint并自主设定新目标
   }
 
   /**
-   * 基于完成的目标自动生成新目标
+   * 基于完成的目标自动生成新目标（已废弃 - 新系统使用LLM自主决策）
    */
-  private async generateNewGoalAfterCompletion(completedGoal: Goal): Promise<void> {
-    try {
-      // 🔧 关键修复：检查中断标志，如果正在执行 GUI 模式，延迟生成新目标
-      if (this.state.interrupt.isInterrupted()) {
-        const reason = this.state.interrupt.getReason();
-        this.logger.info(`⏸️ 检测到中断标志（${reason}），延迟生成新目标`);
-
-        // 等待中断解除后再生成新目标
-        setTimeout(() => {
-          if (!this.state.interrupt.isInterrupted()) {
-            this.generateNewGoalAfterCompletion(completedGoal);
-          }
-        }, 2000); // 2秒后重试
-
-        return;
-      }
-
-      this.logger.info('🤖 正在分析环境，生成新目标...');
-
-      // 记录思考过程
-      this.state.memory.recordThought('🤖 分析已完成目标，准备生成新目标', {
-        completedGoal: completedGoal.description,
-      });
-
-      // 1. 收集环境信息
-      const environmentData = this.collectEnvironmentData();
-
-      // 2. 获取历史目标信息
-      const completedGoalsHistory = this.getCompletedGoalsHistory();
-
-      // 3. 调用LLM生成新目标
-      const newGoalData = await this.generateGoalWithLLM(completedGoal, environmentData, completedGoalsHistory);
-
-      if (newGoalData) {
-        // 4. 创建新目标
-        await this.createNewGoal(newGoalData);
-      } else {
-        // 如果LLM生成失败，记录并等待用户指令
-        this.logger.warn('🎯 LLM目标生成失败，暂时等待用户指令');
-        this.state.memory.recordThought('🎯 LLM目标生成失败，等待用户指令', {});
-      }
-    } catch (error) {
-      this.logger.error('自动目标生成失败:', {}, error as Error);
-      this.state.memory.recordThought('🎯 自动目标生成出错，等待用户指令', {
-        error: (error as Error).message,
-      });
-    }
+  private async generateNewGoalAfterCompletion(_completedGoal: any): Promise<void> {
+    // 新系统中，LLM会在看到goal_completed_hint后自主设定新目标
+    // 不需要程序主动生成
   }
 
   /**
@@ -314,106 +255,26 @@ export class Agent {
   }
 
   /**
-   * 获取已完成目标的历史
+   * 获取已完成目标的历史（已废弃）
    */
   private getCompletedGoalsHistory(): any[] {
-    const goals = this.state.planningManager.getAllGoals();
-    const completedGoals = Array.from(goals.values())
-      .filter((goal: Goal) => goal.status === 'completed')
-      .map((goal: Goal) => ({
-        description: goal.description,
-        createdAt: goal.createdAt,
-        completedAt: goal.completedAt,
-        duration: goal.completedAt ? goal.completedAt - goal.createdAt : 0,
-        planCount: goal.planIds.length,
-      }))
-      .sort((a, b) => (b.completedAt || 0) - (a.completedAt || 0)) // 按完成时间倒序
-      .slice(0, 10); // 只取最近10个
-
-    return completedGoals;
+    // 新系统中可以从goalManager获取，但目前不需要
+    return [];
   }
 
   /**
-   * 使用LLM生成新目标
+   * 使用LLM生成新目标（已废弃）
    */
-  private async generateGoalWithLLM(completedGoal: Goal, environmentData: any, completedGoalsHistory: any[]): Promise<any> {
-    try {
-      const { promptManager } = await import('@/core/agent/prompt');
-
-      const promptData = {
-        completed_goals: completedGoalsHistory.map(g => `- ${g.description} (${Math.round(g.duration / 60000)}分钟)`).join('\n'),
-        position: environmentData.position
-          ? `${environmentData.position.x}, ${environmentData.position.y}, ${environmentData.position.z}`
-          : '未知位置',
-        health: environmentData.health,
-        food: environmentData.food,
-        inventory: environmentData.inventory,
-        time: environmentData.time > 12000 ? '夜晚' : '白天',
-        environment: environmentData.environment,
-        experiences: this.state.memory.experience
-          .getRecent(5)
-          .map((e: any) => e.content)
-          .join('\n'), // 最近5条经验
-      };
-
-      const response = await this.llmManager.chatCompletion(
-        promptManager.generatePrompt('goal_generation', promptData),
-        '你是一个Minecraft游戏助手，需要生成合适的下一个游戏目标。',
-      );
-
-      if (!response.success) {
-        this.logger.error('LLM目标生成请求失败:', response.error);
-        return null;
-      }
-
-      // 解析JSON响应
-      const content = response.content.trim();
-      const jsonMatch = content.match(/```json\s*(\{[\s\S]*?\})\s*```/);
-      if (!jsonMatch) {
-        this.logger.error('LLM响应格式错误，无法解析JSON');
-        return null;
-      }
-
-      const goalData = JSON.parse(jsonMatch[1]);
-
-      // 验证必需字段
-      if (!goalData.goal || !goalData.reasoning) {
-        this.logger.error('LLM响应缺少必需字段');
-        return null;
-      }
-
-      this.logger.info(`🎯 LLM生成新目标: ${goalData.goal}`);
-      return goalData;
-    } catch (error) {
-      this.logger.error('LLM目标生成解析失败:', {}, error as Error);
-      return null;
-    }
+  private async generateGoalWithLLM(_completedGoal: any, _environmentData: any, _completedGoalsHistory: any[]): Promise<any> {
+    // 新系统中由LLM通过plan_action自主创建目标
+    return null;
   }
 
   /**
-   * 创建新目标并自动生成计划
+   * 创建新目标并自动生成计划（已废弃）
    */
-  private async createNewGoal(goalData: any): Promise<void> {
-    try {
-      // 记录生成的目标信息
-      this.state.memory.recordThought(`🎯 生成新目标: ${goalData.goal}`, {
-        reasoning: goalData.reasoning,
-        difficulty: goalData.difficulty,
-        estimatedTime: goalData.estimated_time,
-        priority: goalData.priority,
-        category: goalData.category,
-      });
-
-      // 创建新目标
-      const goal = await this.state.planningManager.createGoal(goalData.goal);
-
-      this.logger.info(`✅ 新目标已创建: ${goalData.goal}`);
-
-      // 自动生成计划
-      await this.generatePlanForNewGoal(goal);
-    } catch (error) {
-      this.logger.error('创建新目标失败:', {}, error as Error);
-    }
+  private async attemptToCreateNewGoal(): Promise<void> {
+    // 新系统中由LLM通过plan_action自主创建目标
   }
 
   /**
@@ -498,6 +359,8 @@ export class Agent {
         this.state.context.blockCache.save?.(),
         this.state.context.containerCache.save?.(),
         this.state.context.locationManager.save?.(),
+        this.state.context.goalManager?.save?.('./data'),
+        this.state.context.taskManager?.save?.('./data'),
       ]);
 
       this.logger.info('✅ Agent 状态保存完成');
@@ -510,11 +373,14 @@ export class Agent {
    * 获取状态摘要
    */
   getStatus(): AgentStatus {
+    const goalManager = this.state.context.goalManager;
+    const currentGoal = goalManager?.getCurrentGoal();
+
     return {
       isRunning: this.isRunning,
       currentMode: this.state.modeManager.getCurrentMode(),
-      goal: this.state.goal,
-      currentTask: this.state.planningManager.getCurrentTask(),
+      goal: currentGoal?.content || this.state.goal,
+      currentTask: null, // 新系统中不再有单一的currentTask概念
       interrupted: this.state.interrupt.isInterrupted(),
       interruptReason: this.state.interrupt.getReason(),
     };
@@ -525,7 +391,10 @@ export class Agent {
    */
   setGoal(description: string): void {
     (this.state as any).goal = description;
-    this.state.planningManager.createGoal(description);
-    this.logger.info(`🎯 设置新目标: ${description}`);
+    const goalManager = this.state.context.goalManager;
+    if (goalManager) {
+      goalManager.addGoal({ content: description, priority: 5 });
+      this.logger.info(`🎯 设置新目标: ${description}`);
+    }
   }
 }

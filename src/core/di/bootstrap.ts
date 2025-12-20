@@ -111,6 +111,18 @@ export function configureServices(container: Container): void {
     return gameState;
   });
 
+  // GoalManager (单例) - 必须在ContextManager之前注册
+  container.registerSingleton(ServiceKeys.GoalManager, c => {
+    const { GoalManager } = require('@/core/agent/planning/goal/GoalManager');
+    return new GoalManager();
+  });
+
+  // TaskManager (单例) - 必须在ContextManager之前注册
+  container.registerSingleton(ServiceKeys.TaskManager, c => {
+    const { TaskManager } = require('@/core/agent/planning/task/TaskManager');
+    return new TaskManager();
+  });
+
   // ContextManager (单例)
   container.registerSingleton(ServiceKeys.ContextManager, c => {
     const { ContextManager } = require('@/core/context/ContextManager');
@@ -128,6 +140,8 @@ export function configureServices(container: Container): void {
     const movementUtils = c.resolve(ServiceKeys.MovementUtils) as MovementUtils;
     const craftManager = c.resolve(ServiceKeys.CraftManager) as import('@/core/crafting/CraftManager').CraftManager;
     const interruptSignal = c.resolve(ServiceKeys.InterruptSignal);
+    const goalManager = c.resolve(ServiceKeys.GoalManager);
+    const taskManager = c.resolve(ServiceKeys.TaskManager);
 
     contextManager.createContextWithDI({
       bot,
@@ -142,6 +156,8 @@ export function configureServices(container: Container): void {
       placeBlockUtils,
       movementUtils,
       craftManager,
+      goalManager,
+      taskManager,
     });
 
     return contextManager;
@@ -258,35 +274,6 @@ export function configureServices(container: Container): void {
       await memory.saveAll();
     });
 
-  // GoalPlanningManager (单例)
-  container
-    .registerSingleton(ServiceKeys.GoalPlanningManager, c => {
-      const { GoalPlanningManager } = require('@/core/agent/planning/GoalPlanningManager');
-      const executor = c.resolve(ServiceKeys.ActionExecutor) as any;
-      const contextManager = executor.getContextManager();
-      const context = contextManager.getContext();
-
-      const gameContext = {
-        gameState: context.gameState,
-        blockCache: context.blockCache,
-        containerCache: context.containerCache,
-        locationManager: context.locationManager,
-        logger: context.logger,
-      };
-
-      const planningManager = new GoalPlanningManager(gameContext);
-      const llmManager = c.resolve(ServiceKeys.LLMManager);
-      planningManager.setLLMManager(llmManager);
-
-      return planningManager;
-    })
-    .withInitializer(ServiceKeys.GoalPlanningManager, async (manager: any) => {
-      await manager.initialize();
-    })
-    .withDisposer(ServiceKeys.GoalPlanningManager, (manager: any) => {
-      manager.stop();
-    });
-
   // ModeManager (单例)
   container.registerSingleton(ServiceKeys.ModeManager, c => {
     const { ModeManager } = require('@/core/agent/mode/ModeManager');
@@ -391,11 +378,10 @@ export function configureServices(container: Container): void {
       const config = c.resolve<AppConfig>(ServiceKeys.Config);
       const logger = c.resolve<Logger>(ServiceKeys.Logger);
       const memory = await c.resolveAsync(ServiceKeys.MemoryManager);
-      const planningManager = await c.resolveAsync(ServiceKeys.GoalPlanningManager);
       const modeManager = c.resolve(ServiceKeys.ModeManager);
       const interrupt = c.resolve(ServiceKeys.InterruptController);
 
-      return new Agent(bot, executor, llmManager, config, memory, planningManager, modeManager, interrupt, logger);
+      return new Agent(bot, executor, llmManager, config, memory, modeManager, interrupt, logger);
     })
     .withInitializer(ServiceKeys.Agent, async (agent: any) => {
       await agent.initialize();
@@ -449,7 +435,12 @@ function registerActions(executor: any, logger: Logger): void {
     SetLocationAction,
   } = require('@/core/actions/implementations');
 
+  const { PlanAction } = require('@/core/actions/implementations/PlanAction');
+
   const actions = [
+    // 规划管理
+    new PlanAction(),
+
     // P0 核心动作
     new ChatAction(),
     new MoveAction(),

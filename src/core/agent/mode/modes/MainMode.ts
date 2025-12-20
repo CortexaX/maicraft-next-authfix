@@ -166,7 +166,9 @@ export class MainMode extends BaseMode {
 
     // 生成系统提示词，包含动作信息（传递上下文以启用动作过滤）
     const actionPromptGenerator = new ActionPromptGenerator(this.state!.context.executor);
-    const availableActions = actionPromptGenerator.generatePrompt(this.state!.context);
+    // 如果没有目标，简化其他动作的显示，突出plan_action
+    const hasGoal = this.state!.context.goalManager?.getCurrentGoal();
+    const availableActions = actionPromptGenerator.generatePrompt(this.state!.context, !hasGoal);
     const eatAction = actionPromptGenerator.generateActionPrompt('eat' as any);
     const killMobAction = actionPromptGenerator.generateActionPrompt('kill_mob' as any);
 

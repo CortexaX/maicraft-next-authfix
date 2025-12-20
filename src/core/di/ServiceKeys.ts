@@ -36,7 +36,8 @@ export const ServiceKeys = {
   // AI 代理系统
   Agent: Symbol('Agent'),
   MemoryManager: Symbol('MemoryManager'),
-  GoalPlanningManager: Symbol('GoalPlanningManager'),
+  GoalManager: Symbol('GoalManager'),
+  TaskManager: Symbol('TaskManager'),
   ModeManager: Symbol('ModeManager'),
   InterruptController: Symbol('InterruptController'),
   MaiBotClient: Symbol('MaiBotClient'),
@@ -100,7 +101,8 @@ export interface ServiceTypeMap {
   [ServiceKeys.LLMManager]: import('@/llm/LLMManager').LLMManager;
   [ServiceKeys.Agent]: import('@/core/agent/Agent').Agent;
   [ServiceKeys.MemoryManager]: import('@/core/agent/memory/MemoryManager').MemoryManager;
-  [ServiceKeys.GoalPlanningManager]: import('@/core/agent/planning/GoalPlanningManager').GoalPlanningManager;
+  [ServiceKeys.GoalManager]: import('@/core/agent/planning/goal/GoalManager').GoalManager;
+  [ServiceKeys.TaskManager]: import('@/core/agent/planning/task/TaskManager').TaskManager;
   [ServiceKeys.ModeManager]: import('@/core/agent/mode/ModeManager').ModeManager;
   [ServiceKeys.InterruptController]: import('@/core/agent/InterruptController').InterruptController;
   [ServiceKeys.MaiBotClient]: import('@/core/agent/communication/MaiBotClient').MaiBotClient;

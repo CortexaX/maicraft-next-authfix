@@ -1,19 +1,28 @@
 /**
  * 追踪器工厂
  * 用于创建和反序列化追踪器
+ *
+ * 支持的Tracker类型：
+ * - 状态型：inventory, location, entity, environment
+ * - 动作型：craft
+ * - 组合型：composite
  */
 
-import type { TaskTracker } from '@/core/agent/planning/types';
+import type { Tracker, TrackerConfig, ITrackerFactory } from './types';
 import { InventoryTracker } from './InventoryTracker';
 import { LocationTracker } from './LocationTracker';
 import { CraftTracker } from './CraftTracker';
+import { EntityTracker } from './EntityTracker';
+import { EnvironmentTracker } from './EnvironmentTracker';
 import { CompositeTracker } from './CompositeTracker';
 
-export class TrackerFactory {
+export class TrackerFactory implements ITrackerFactory {
   private trackers: Map<string, any> = new Map([
     ['inventory', InventoryTracker],
     ['location', LocationTracker],
     ['craft', CraftTracker],
+    ['entity', EntityTracker],
+    ['environment', EnvironmentTracker],
     ['composite', CompositeTracker],
   ]);
 
@@ -25,16 +34,23 @@ export class TrackerFactory {
   }
 
   /**
+   * 从配置创建追踪器
+   */
+  createTracker(config: TrackerConfig): Tracker {
+    return this.fromJSON(config);
+  }
+
+  /**
    * 从 JSON 创建追踪器
    */
-  fromJSON(json: any): TaskTracker {
+  fromJSON(json: any): Tracker {
     const TrackerClass = this.trackers.get(json.type);
 
     if (!TrackerClass) {
       throw new Error(`未知的追踪器类型: ${json.type}`);
     }
 
-    // CompositeTracker 需要特殊处理
+    // CompositeTracker 需要特殊处理（需要递归创建子Tracker）
     if (json.type === 'composite') {
       return CompositeTracker.fromJSON(json, this);
     }
@@ -53,7 +69,7 @@ export class TrackerFactory {
    * 兼容旧代码的静态方法
    * @deprecated 使用DI容器：container.resolve(ServiceKeys.TrackerFactory).fromJSON(json)
    */
-  static fromJSON(json: any): TaskTracker {
+  static fromJSON(json: any): Tracker {
     const factory = new TrackerFactory();
     return factory.fromJSON(json);
   }

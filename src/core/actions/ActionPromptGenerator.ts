@@ -29,8 +29,9 @@ export class ActionPromptGenerator {
   /**
    * 生成动作列表提示词
    * @param context 运行时上下文，用于判断哪些动作应该激活
+   * @param simplifyOthers 是否简化非plan_action的动作显示（只显示名称和描述）
    */
-  generatePrompt(context?: RuntimeContext): string {
+  generatePrompt(context?: RuntimeContext, simplifyOthers: boolean = false): string {
     let actions = this.executor.getRegisteredActions();
 
     // 如果提供了上下文，则过滤应该激活的动作
@@ -44,16 +45,20 @@ export class ActionPromptGenerator {
 
     const lines: string[] = ['# 可用动作', ''];
 
-    for (const action of actions) {
-      lines.push(`## ${action.name}`);
-      lines.push(action.description);
+    // plan_action放在最前面
+    const planAction = actions.find(a => a.id === 'plan_action');
+    const otherActions = actions.filter(a => a.id !== 'plan_action');
+
+    if (planAction) {
+      lines.push(`## ${planAction.name}`);
+      lines.push(planAction.description);
       lines.push('');
       lines.push('```json');
       lines.push(
         JSON.stringify(
           {
-            action_type: action.id,
-            ...action.getParamsSchema?.(),
+            action_type: planAction.id,
+            ...planAction.getParamsSchema?.(),
           },
           null,
           2,
@@ -61,6 +66,30 @@ export class ActionPromptGenerator {
       );
       lines.push('```');
       lines.push('');
+    }
+
+    // 其他动作根据simplifyOthers决定显示方式
+    for (const action of otherActions) {
+      lines.push(`## ${action.name}`);
+      lines.push(action.description);
+      lines.push('');
+
+      if (!simplifyOthers) {
+        // 完整显示参数
+        lines.push('```json');
+        lines.push(
+          JSON.stringify(
+            {
+              action_type: action.id,
+              ...action.getParamsSchema?.(),
+            },
+            null,
+            2,
+          ),
+        );
+        lines.push('```');
+        lines.push('');
+      }
     }
 
     return lines.join('\n');
@@ -142,6 +171,29 @@ export class ActionPromptGenerator {
         lines.push('```');
         lines.push('');
       }
+    }
+
+    return lines.join('\n');
+  }
+
+  /**
+   * 生成简化的动作列表（仅名称和描述，不含参数）
+   * 用于规划模式，节省token
+   */
+  generateSimplifiedActionList(context?: RuntimeContext): string {
+    let actions = this.executor.getRegisteredActions();
+
+    // 如果提供了上下文，则过滤应该激活的动作
+    if (context) {
+      actions = this.filterActiveActions(actions, context);
+    }
+
+    // 排除plan_action
+    const actionList = actions.filter(a => a.id !== 'plan_action');
+
+    const lines: string[] = [];
+    for (const action of actionList) {
+      lines.push(`- **${action.name}**: ${action.description}`);
     }
 
     return lines.join('\n');

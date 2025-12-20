@@ -1,12 +1,12 @@
 /**
- * 制作追踪器
+ * 制作追踪器（动作型Tracker）
  * 检查是否制作了指定物品（通过背包增量检测）
  */
 
-import type { TaskTracker, TaskProgress } from '@/core/agent/planning/types';
+import type { Tracker, TrackerProgress } from './types';
 import type { GameContext } from '@/core/agent/types';
 
-export class CraftTracker implements TaskTracker {
+export class CraftTracker implements Tracker {
   readonly type = 'craft';
 
   private initialCount: number = 0;
@@ -28,13 +28,13 @@ export class CraftTracker implements TaskTracker {
     return crafted >= this.targetCount;
   }
 
-  getProgress(context: GameContext): TaskProgress {
+  getProgress(context: GameContext): TrackerProgress {
     if (!this.initialized) {
       this.initialize(context);
     }
 
     const currentCount = this.getCurrentCount(context);
-    const crafted = currentCount - this.initialCount;
+    const crafted = Math.max(0, currentCount - this.initialCount);
 
     return {
       current: crafted,

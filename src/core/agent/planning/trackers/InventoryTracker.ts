@@ -1,31 +1,39 @@
 /**
- * 背包追踪器
+ * 背包追踪器（状态型Tracker）
  * 检查背包中的物品数量
  */
 
-import type { TaskTracker, TaskProgress } from '@/core/agent/planning/types';
+import type { Tracker, TrackerProgress } from './types';
 import type { GameContext } from '@/core/agent/types';
 
-export class InventoryTracker implements TaskTracker {
+export class InventoryTracker implements Tracker {
   readonly type = 'inventory';
 
   constructor(
     private itemName: string,
     private targetCount: number,
-    private exact: boolean = false, // 是否需要精确数量
+    private minCount?: number, // 最小数量（可选）
+    private maxCount?: number, // 最大数量（可选）
   ) {}
 
   checkCompletion(context: GameContext): boolean {
     const currentCount = this.getCurrentCount(context);
 
-    if (this.exact) {
-      return currentCount === this.targetCount;
-    } else {
-      return currentCount >= this.targetCount;
+    // 检查最小值
+    if (this.minCount !== undefined && currentCount < this.minCount) {
+      return false;
     }
+
+    // 检查最大值
+    if (this.maxCount !== undefined && currentCount > this.maxCount) {
+      return false;
+    }
+
+    // 检查目标值（默认为至少达到目标值）
+    return currentCount >= this.targetCount;
   }
 
-  getProgress(context: GameContext): TaskProgress {
+  getProgress(context: GameContext): TrackerProgress {
     const current = this.getCurrentCount(context);
     const target = this.targetCount;
 
@@ -38,8 +46,13 @@ export class InventoryTracker implements TaskTracker {
   }
 
   getDescription(): string {
-    const operator = this.exact ? '恰好' : '至少';
-    return `背包中${operator}有 ${this.targetCount} 个 ${this.itemName}`;
+    if (this.minCount !== undefined && this.maxCount !== undefined) {
+      return `背包中有 ${this.minCount}-${this.maxCount} 个 ${this.itemName}`;
+    } else if (this.minCount !== undefined) {
+      return `背包中至少有 ${this.minCount} 个 ${this.itemName}`;
+    } else {
+      return `背包中至少有 ${this.targetCount} 个 ${this.itemName}`;
+    }
   }
 
   private getCurrentCount(context: GameContext): number {
@@ -53,11 +66,12 @@ export class InventoryTracker implements TaskTracker {
       type: 'inventory',
       itemName: this.itemName,
       targetCount: this.targetCount,
-      exact: this.exact,
+      minCount: this.minCount,
+      maxCount: this.maxCount,
     };
   }
 
   static fromJSON(json: any): InventoryTracker {
-    return new InventoryTracker(json.itemName, json.targetCount, json.exact);
+    return new InventoryTracker(json.itemName, json.targetCount, json.minCount, json.maxCount);
   }
 }

@@ -15,6 +15,8 @@ import { initChestOperationTemplate } from './chest_operation';
 import { initExperienceSummaryTemplate } from './experience_summary';
 import { initPlanGenerationTemplate } from './plan_generation';
 import { initGoalGenerationTemplate } from './goal_generation';
+import { initPlanningSystemTemplate } from './planning_system';
+import { initPlanningThinkingTemplate } from './planning_thinking';
 
 // 导出所有初始化函数
 export {
@@ -29,5 +31,6 @@ export {
   initExperienceSummaryTemplate,
   initPlanGenerationTemplate,
   initGoalGenerationTemplate,
+  initPlanningSystemTemplate,
+  initPlanningThinkingTemplate,
 };
-

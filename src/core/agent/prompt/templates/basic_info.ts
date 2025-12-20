@@ -14,9 +14,9 @@ export function initBasicInfoTemplate(): void {
     new PromptTemplate(
       'basic_info',
       `# 当前目标和任务规划
-目标：{goal}
+{current_goal}
 
-{to_do_list}
+{task_list}{goal_completed_hint}
 
 # 当前状态
 {self_status_info}
@@ -41,8 +41,9 @@ export function initBasicInfoTemplate(): void {
 `,
       '基础信息（动态部分）',
       [
-        'goal',
-        'to_do_list',
+        'current_goal',
+        'task_list',
+        'goal_completed_hint',
         'self_status_info',
         'inventory_info',
         'position',

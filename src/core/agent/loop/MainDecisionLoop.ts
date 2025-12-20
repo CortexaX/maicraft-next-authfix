@@ -21,7 +21,6 @@ import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
 export class MainDecisionLoop extends BaseLoop<AgentState> {
   private llmManager: LLMManager;
   private structuredOutputManager: StructuredOutputManager;
-  private evaluationCounter: number = 0;
   private promptsInitialized: boolean = false;
   private dataCollector: PromptDataCollector;
 
@@ -52,7 +51,7 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
 
   /**
    * 执行一次循环迭代
-   * 参考原maicraft的run_execute_loop和next_thinking设计
+   * 采用ReAct模式：观察 → 思考 → 工具调用 → 观察结果
    */
   protected async runLoopIteration(): Promise<void> {
     // 1. 检查中断
@@ -64,13 +63,38 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
       return;
     }
 
-    // 2. 通知游戏状态更新
+    // 2. 自动检测目标和任务完成（每次循环）
+    try {
+      const goalManager = this.state.context.goalManager;
+      const taskManager = this.state.context.taskManager;
+      const gameContext = {
+        gameState: this.state.context.gameState,
+      } as any;
+
+      if (goalManager) {
+        goalManager.checkCompletion(gameContext);
+      }
+      if (taskManager) {
+        taskManager.checkCompletion(gameContext);
+      }
+    } catch (error) {
+      this.logger.error('❌ 目标/任务自动检测失败:', undefined, error as Error);
+    }
+
+    // 3. 通知游戏状态更新
     await this.notifyGameStateUpdate();
 
-    // 3. 检查是否需要生成计划
-    await this.checkAndGeneratePlan();
+    // 4. 检查是否需要进入规划模式
+    const needsPlanning = this.checkNeedsPlanning();
+    if (needsPlanning && this.state.modeManager.getCurrentMode() !== 'planning_mode') {
+      this.logger.info('🎯 检测到需要规划，切换到规划模式');
+      await this.state.modeManager.setMode(ModeManager.MODE_TYPES.PLANNING, '有目标但无任务，需要规划');
+      // 模式切换后，跳过本次决策，让规划模式在下次循环中执行
+      await this.sleep(500);
+      return;
+    }
 
-    // 4. 检查模式自动切换
+    // 5. 检查模式自动切换
     const modeSwitched = await this.state.modeManager.checkAutoTransitions();
     if (modeSwitched) {
       this.logger.debug('✨ 模式已自动切换');
@@ -79,25 +103,14 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
       return;
     }
 
-    // 5. 执行当前模式逻辑
+    // 6. 执行当前模式逻辑
     await this.executeCurrentMode();
 
-    // 6. 定期评估任务
-    this.evaluationCounter++;
-    this.logger.debug(`🔄 循环计数: ${this.evaluationCounter}`);
-
-    if (this.evaluationCounter % 5 === 0) {
-      this.logger.debug('📋 执行任务评估');
-      await this.evaluateTask();
-    }
-
     // 7. 定期总结经验（每10次循环）
-    if (this.evaluationCounter % 10 === 0) {
-      this.logger.debug('📚 执行经验总结');
-      await this.summarizeExperience();
-    }
+    // 注意：删除了任务评估，改为自动检测
+    // TODO: 添加循环计数器（如需要）
 
-    // 8. 根据当前模式调整等待时间
+    // 7. 根据当前模式调整等待时间
     await this.adjustSleepDelay();
   }
 
@@ -115,53 +128,40 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 检查并生成计划
-   * 如果有目标但没有计划，则自动生成计划
+   * 检查是否需要进入规划模式
+   * 触发条件：有活动目标但没有任务时
+   */
+  private checkNeedsPlanning(): boolean {
+    const goalManager = this.state.context.goalManager;
+    const taskManager = this.state.context.taskManager;
+
+    if (!goalManager || !taskManager) {
+      return false;
+    }
+
+    // 获取当前目标
+    const currentGoal = goalManager.getCurrentGoal();
+    if (!currentGoal) {
+      return false; // 没有目标，不需要规划
+    }
+
+    // 获取当前目标的活动任务
+    const activeTasks = taskManager.getActiveTasks(currentGoal.id);
+
+    // 如果有目标但没有任务，需要规划
+    if (activeTasks.length === 0) {
+      this.logger.debug(`🎯 检测到目标 [${currentGoal.id}] 没有任务，需要规划`);
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 检查并生成计划（已废弃 - 新系统使用ReAct模式）
    */
   private async checkAndGeneratePlan(): Promise<void> {
-    try {
-      const { planningManager } = this.state;
-
-      // 检查是否有当前目标
-      const currentGoal = planningManager.getCurrentGoal();
-      if (!currentGoal) {
-        return; // 没有目标，不需要生成计划
-      }
-
-      // 检查是否已有当前计划
-      const currentPlan = planningManager.getCurrentPlan();
-      if (currentPlan) {
-        return; // 已有计划，不需要生成
-      }
-
-      // 检查目标是否有任何计划
-      if (currentGoal.planIds.length > 0) {
-        // 目标有计划，但当前计划未设置，尝试设置第一个计划
-        const firstPlanId = currentGoal.planIds[0];
-        planningManager.setCurrentPlan(firstPlanId);
-        this.logger.info(`📋 恢复计划: ${firstPlanId}`);
-        return;
-      }
-
-      // 没有计划，自动生成
-      this.logger.info(`🎯 检测到目标没有计划，开始自动生成...`);
-      this.state.memory.recordThought(`🎯 为目标 "${currentGoal.description}" 生成执行计划`, {});
-
-      const plan = await planningManager.generatePlanForCurrentGoal();
-
-      if (plan) {
-        this.logger.info(`✅ 成功生成计划: ${plan.title} (${plan.tasks.length} 个任务)`);
-        this.state.memory.recordThought(`📋 生成计划: ${plan.title}`, {
-          tasksCount: plan.tasks.length,
-          planId: plan.id,
-        });
-      } else {
-        this.logger.warn('⚠️ 计划生成失败');
-        this.state.memory.recordThought(`⚠️ 计划生成失败，将继续尝试执行目标`, {});
-      }
-    } catch (error) {
-      this.logger.error('❌ 检查并生成计划失败:', undefined, error as Error);
-    }
+    // 新系统中不需要预先生成计划
   }
 
   /**
@@ -205,103 +205,10 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 评估任务
-   *
-   * 使用结构化输出，返回可操作的评估结果
-   * 根据评估结果触发相应的行动（重新规划、跳过任务等）
+   * 评估任务（已废弃 - 新系统使用自动检测）
    */
   private async evaluateTask(): Promise<void> {
-    try {
-      const { planningManager } = this.state;
-
-      // 获取当前任务
-      const currentTask = planningManager?.getCurrentTask();
-      if (!currentTask) {
-        this.logger.debug('没有当前任务，跳过评估');
-        return;
-      }
-
-      // 复用主模式的数据收集器，获取基础信息
-      const basicInfo = this.dataCollector.collectBasicInfo();
-
-      // 获取记忆数据
-      const memoryData = this.dataCollector.collectMemoryData();
-
-      // 获取任务历史统计
-      const taskStats = planningManager.getTaskHistoryStats(currentTask.title);
-      const taskStatsText =
-        taskStats.totalExecuted > 0
-          ? `执行次数: ${taskStats.totalExecuted}, 成功: ${taskStats.totalCompleted}, 失败: ${taskStats.totalFailed}, 平均时长: ${taskStats.averageDuration}秒`
-          : '首次执行';
-
-      // 构建评估数据（使用完整的 basicInfo，与主提示词保持一致）
-      const evaluationData = {
-        // 任务相关
-        goal: basicInfo.goal,
-        current_task: currentTask.title,
-        task_description: currentTask.description || '无描述',
-        to_do_list: basicInfo.to_do_list, // 当前的计划和任务列表
-        task_stats: taskStatsText,
-
-        // 状态信息（与主提示词完全一致）
-        position: basicInfo.position,
-        inventory: basicInfo.inventory_info,
-        health: basicInfo.self_status_info,
-
-        // 环境信息（对任务评估很重要）
-        block_search_distance: basicInfo.block_search_distance || 50, // 方块搜索距离
-        nearby_block_info: basicInfo.nearby_block_info, // 周围方块，对采集任务很重要
-        entity_search_distance: basicInfo.entity_search_distance || 16, // 实体搜索距离
-        nearby_entities_info: basicInfo.nearby_entities_info, // 周围实体，对安全评估很重要
-        container_cache_info: basicInfo.container_cache_info, // 容器信息，对存储任务很重要
-
-        // 交互信息
-        chat_str: basicInfo.chat_str, // 玩家指令和交流
-
-        // 记忆和历史
-        recent_decisions: memoryData.thinking_list,
-        recent_thoughts: memoryData.thinking_list,
-        failed_hint: memoryData.failed_hint, // 失败提示，帮助评估避免重复错误
-      };
-
-      // 生成评估提示词
-      const prompt = promptManager.generatePrompt('task_evaluation', evaluationData);
-
-      // 使用系统提示词模板
-      const systemPrompt = promptManager.generatePrompt('task_evaluation_system', {
-        bot_name: basicInfo.bot_name,
-        player_name: basicInfo.player_name,
-      });
-
-      // 使用结构化输出管理器请求任务评估
-      const evaluation = await this.structuredOutputManager.requestTaskEvaluation(prompt, systemPrompt);
-
-      if (evaluation) {
-        // 记录评估结果到思维记忆
-        const evaluationSummary = `[任务评估] 状态: ${evaluation.task_status}, 进度: ${evaluation.progress_assessment}`;
-        this.state.memory.recordThought(evaluationSummary, {
-          issues: evaluation.issues,
-          suggestions: evaluation.suggestions,
-        });
-
-        // 记录问题和建议
-        if (evaluation.issues.length > 0) {
-          this.logger.warn(`⚠️ 发现问题: ${evaluation.issues.join('; ')}`);
-        }
-        if (evaluation.suggestions.length > 0) {
-          this.logger.info(`💡 改进建议: ${evaluation.suggestions.join('; ')}`);
-        }
-
-        // 处理评估结果，触发相应行动
-        await planningManager.handleTaskEvaluation(evaluation);
-
-        this.logger.info(`📊 任务评估完成: ${evaluation.task_status} (置信度: ${(evaluation.confidence * 100).toFixed(0)}%)`);
-      } else {
-        this.logger.warn('⚠️ 任务评估未返回有效结果');
-      }
-    } catch (error) {
-      this.logger.error('❌ 任务评估异常', undefined, error as Error);
-    }
+    // 新系统中使用Tracker自动检测任务完成，不需要定期评估
   }
 
   /**
@@ -346,7 +253,7 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
           .join('\n'),
         recent_thoughts: recentThoughts.map((t, i) => `${i + 1}. ${t.content}`).join('\n'),
         current_goal: this.state.goal,
-        current_task: this.state.planningManager.getCurrentTask()?.title || '无任务',
+        current_task: '无任务', // 新系统中不再有单一currentTask
       };
 
       this.logger.debug('经验总结数据构建完成', {

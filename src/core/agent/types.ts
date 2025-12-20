@@ -4,7 +4,6 @@
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
 import type { ModeManager } from './mode/ModeManager';
-import type { GoalPlanningManager } from './planning/GoalPlanningManager';
 import type { MemoryManager } from './memory/MemoryManager';
 import type { InterruptController } from './InterruptController';
 import type { AppConfig as Config } from '@/utils/Config';
@@ -18,12 +17,11 @@ export interface AgentState {
   readonly goal: string;
   isRunning: boolean;
 
-  // 运行时上下文
+  // 运行时上下文（包含goalManager和taskManager）
   readonly context: RuntimeContext;
 
   // 子系统
   readonly modeManager: ModeManager;
-  readonly planningManager: GoalPlanningManager;
   readonly memory: MemoryManager;
   readonly llmManager: any; // LLMManager 类型
 

@@ -124,7 +124,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const userPrompt = promptManager.generatePrompt('chat_response', {
         player_name: this.state.context.gameState.playerName || 'Bot',
         recent_conversations: conversationText,
-        current_activity: this.state.planningManager.getCurrentTask()?.title || '空闲中',
+        current_activity: '空闲中', // 新系统中不再有单一currentTask
         position: `位置: (${this.state.context.gameState.blockPosition.x}, ${this.state.context.gameState.blockPosition.y}, ${this.state.context.gameState.blockPosition.z})`,
       });
 
@@ -163,7 +163,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const userPrompt = promptManager.generatePrompt('chat_initiate', {
         player_name: this.state.context.gameState.playerName || 'Bot',
         recent_conversations: conversationText,
-        current_activity: this.state.planningManager.getCurrentTask()?.title || '空闲中',
+        current_activity: '空闲中', // 新系统中不再有单一currentTask
         position: `位置: (${this.state.context.gameState.blockPosition.x}, ${this.state.context.gameState.blockPosition.y}, ${this.state.context.gameState.blockPosition.z})`,
       });
 

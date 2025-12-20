@@ -14,6 +14,8 @@ export { initChestOperationTemplate } from './chest_operation';
 export { initExperienceSummaryTemplate } from './experience_summary';
 export { initPlanGenerationTemplate } from './plan_generation';
 export { initGoalGenerationTemplate } from './goal_generation';
+export { initPlanningSystemTemplate } from './planning_system';
+export { initPlanningThinkingTemplate } from './planning_thinking';
 
 // 导入所有模板初始化函数（一次性）
 import {
@@ -28,6 +30,8 @@ import {
   initExperienceSummaryTemplate,
   initPlanGenerationTemplate,
   initGoalGenerationTemplate,
+  initPlanningSystemTemplate,
+  initPlanningThinkingTemplate,
 } from './template_initializers';
 
 /**
@@ -48,6 +52,10 @@ export function initAllCoreTemplates(): void {
     initPlanGenerationTemplate();
     initGoalGenerationTemplate();
     initExperienceSummaryTemplate();
+
+    // 规划模板
+    initPlanningSystemTemplate();
+    initPlanningThinkingTemplate();
 
     // 交互模板
     initChatResponseTemplate();

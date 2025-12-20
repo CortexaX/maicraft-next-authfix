@@ -83,15 +83,49 @@ export class PromptDataCollector {
    * 收集基础信息
    */
   collectBasicInfo(): BaseInfoData {
-    const { gameState } = this.state.context;
-    const { planningManager } = this.state;
+    const { gameState, goalManager, taskManager } = this.state.context;
+
+    // 格式化目标和任务
+    const gameContext = { gameState } as any;
+    const hasGoal = goalManager?.getCurrentGoal();
+
+    let current_goal: string;
+    let task_list: string;
+    let goal_completed_hint: string;
+
+    if (!hasGoal) {
+      // 没有目标时，显示强调提示
+      current_goal = `⚠️ 当前没有活动目标！
+
+💡 你需要立即使用 plan_action 动作来创建目标和任务：
+1. 首先添加一个目标 (type="goal", operation="add")
+   - 目标应该是抽象的、需要多步骤完成的（如"收集资源"、"探索世界"）
+   - 可选择不配置tracker，因为目标较抽象
+2. 然后为目标添加具体的任务 (type="task", operation="add", goalId="目标ID")
+   - 任务应该是具体的、可以用单个动作完成的
+   - 建议配置tracker自动检测完成
+
+示例：
+添加目标：{"type": "goal", "operation": "add", "content": "收集基础资源", "priority": 5}
+添加任务：{"type": "task", "operation": "add", "goalId": "collect_basic_resources", "content": "收集20个橡木原木", "tracker": {"type": "inventory", "itemName": "oak_log", "targetCount": 20}}`;
+      task_list = '';
+      goal_completed_hint = '';
+    } else {
+      // 有目标时，正常显示
+      current_goal = goalManager.formatGoals(gameContext);
+      task_list = '\n' + (taskManager?.formatTasks(hasGoal.id, gameContext) || '无任务');
+      goal_completed_hint = '';
+    }
 
     return {
       bot_name: 'AI Bot',
       player_name: gameState.playerName || 'Bot',
       self_info: this.formatSelfInfo(gameState),
       goal: this.state.goal,
-      to_do_list: planningManager?.generateStatusSummary() || '暂无任务',
+      current_goal,
+      task_list,
+      to_do_list: task_list, // 保留兼容性
+      goal_completed_hint,
       self_status_info: this.formatStatusInfo(gameState),
       inventory_info: gameState.getInventoryDescription?.() || '空',
       position: this.formatPosition(gameState.blockPosition),
@@ -103,7 +137,7 @@ export class PromptDataCollector {
       nearby_entities_info: gameState.getNearbyEntitiesDescription?.() || '无',
       chat_str: this.getChatHistory(),
       mode: this.state.modeManager.getCurrentMode(),
-      task: planningManager?.getCurrentTask()?.title || '暂无',
+      task: '', // 新系统中不再有单一currentTask
     };
   }
 
@@ -150,7 +184,9 @@ export class PromptDataCollector {
     const memoryData = this.collectMemoryData();
 
     // 添加available_actions到actionData
-    actionData.available_actions = this.actionPromptGenerator.generatePrompt();
+    // 如果没有目标，简化其他动作的显示，突出plan_action
+    const hasGoal = this.state.context.goalManager?.getCurrentGoal();
+    actionData.available_actions = this.actionPromptGenerator.generatePrompt(undefined, !hasGoal);
 
     // 添加judge_guidance到memoryData
     memoryData.judge_guidance = this.getJudgeGuidance();

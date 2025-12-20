@@ -131,6 +131,12 @@ export class GameState {
     this.updateInventory(bot);
     this.updateEnvironment(bot);
 
+    // 立即检查一次inventory，输出调试信息
+    const initialItems = bot.inventory.items();
+    this.logger.info(`[GameState] 初始化时的物品栏: ${initialItems.length} 个物品`, {
+      items: initialItems.map(i => `${i.name}x${i.count}`).join(', ') || '无',
+    });
+
     // 监听健康变化
     bot.on('health', () => {
       this.updateHealth(bot);
@@ -147,8 +153,17 @@ export class GameState {
       this.updateExperience(bot);
     });
 
-    // 监听物品栏变化
+    // 监听物品栏变化 - 需要监听多个事件
     bot.on('windowUpdate', () => {
+      this.updateInventory(bot);
+    });
+
+    // 额外监听：物品拾取、物品使用、物品丢弃等事件
+    bot.on('playerCollect', () => {
+      this.updateInventory(bot);
+    });
+
+    bot.on('itemDrop', () => {
       this.updateInventory(bot);
     });
 
@@ -316,7 +331,15 @@ export class GameState {
    */
   private updateInventory(bot: Bot): void {
     // 更新物品栏
-    this.inventory = bot.inventory.items().map(item => this.itemToItemInfo(item));
+    const items = bot.inventory.items();
+    this.inventory = items.map(item => this.itemToItemInfo(item));
+
+    // 调试日志
+    if (items.length > 0) {
+      this.logger.debug(`[GameState] 物品栏更新: ${items.length} 个物品`, {
+        items: items.map(i => `${i.name}x${i.count}`).join(', '),
+      });
+    }
 
     // 更新手持物品
     if (bot.heldItem) {

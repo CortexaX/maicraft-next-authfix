@@ -103,6 +103,8 @@ export class ContextManager {
     placeBlockUtils: PlaceBlockUtils;
     movementUtils: MovementUtils;
     craftManager: CraftManager;
+    goalManager?: any;
+    taskManager?: any;
   }): RuntimeContext {
     if (this.context) {
       throw new Error('Context already created. Use getContext() to access existing context.');
@@ -121,6 +123,8 @@ export class ContextManager {
       placeBlockUtils,
       movementUtils,
       craftManager,
+      goalManager,
+      taskManager,
     } = params;
 
     // 初始化 GameState
@@ -143,6 +147,8 @@ export class ContextManager {
       placeBlockUtils,
       movementUtils,
       craftManager,
+      goalManager,
+      taskManager,
     };
 
     return this.context;

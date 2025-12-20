@@ -5,7 +5,6 @@
 export { Agent } from './Agent';
 export { InterruptController } from './InterruptController';
 export { MemoryManager } from './memory/MemoryManager';
-export { GoalPlanningManager } from './planning/GoalPlanningManager';
 export { ModeManager } from './mode/ModeManager';
 export { ModeType } from './mode/types';
 export { MainDecisionLoop } from './loop/MainDecisionLoop';
@@ -13,7 +12,6 @@ export { ChatLoop } from './loop/ChatLoop';
 
 // Types
 export type { AgentState, AgentStatus, ActionCall, GameContext } from './types';
-export type { TaskTracker, TaskProgress, TaskStatus, PlanStatus, GoalStatus } from './planning/types';
 export type { ModeTransitionRule } from './mode/types';
 export type {
   MemoryStore,
@@ -26,14 +24,29 @@ export type {
   MemoryStats,
 } from './memory/types';
 
-// Planning classes
-export { Goal } from './planning/Goal';
-export { Plan } from './planning/Plan';
-export { Task } from './planning/Task';
+// Planning - Goal & Task
+export type { Goal, GoalStatus, GoalCompletedBy, CreateGoalParams, UpdateGoalParams } from './planning/goal/Goal';
+export type { Task, TaskStatus, TaskCompletedBy, CreateTaskParams, UpdateTaskParams } from './planning/task/Task';
+export { GoalManager } from './planning/goal/GoalManager';
+export { TaskManager } from './planning/task/TaskManager';
 
 // Trackers
+export type {
+  Tracker,
+  TrackerProgress,
+  TrackerConfig,
+  InventoryTrackerConfig,
+  LocationTrackerConfig,
+  EntityTrackerConfig,
+  EnvironmentTrackerConfig,
+  CraftTrackerConfig,
+  CompositeTrackerConfig,
+  ITrackerFactory,
+} from './planning/trackers/types';
 export { InventoryTracker } from './planning/trackers/InventoryTracker';
 export { LocationTracker } from './planning/trackers/LocationTracker';
 export { CraftTracker } from './planning/trackers/CraftTracker';
+export { EntityTracker } from './planning/trackers/EntityTracker';
+export { EnvironmentTracker } from './planning/trackers/EnvironmentTracker';
 export { CompositeTracker } from './planning/trackers/CompositeTracker';
 export { TrackerFactory } from './planning/trackers/TrackerFactory';

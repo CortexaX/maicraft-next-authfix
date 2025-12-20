@@ -42,6 +42,9 @@ export const ActionIds = {
   SET_LOCATION: 'set_location',
   CHAT: 'chat',
   SWIM_TO_LAND: 'swim_to_land',
+
+  // 规划管理
+  PLAN_ACTION: 'plan_action',
 } as const;
 
 /**
