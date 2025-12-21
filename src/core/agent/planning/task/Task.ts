@@ -62,6 +62,7 @@ export interface Task {
  * 创建Task的参数
  */
 export interface CreateTaskParams {
+  /** LLM传入的语义化ID，可选 */
   id?: string;
   content: string;
   goalId: string;

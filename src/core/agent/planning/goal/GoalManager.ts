@@ -24,8 +24,8 @@ export class GoalManager {
       throw new Error(`已有活动目标，请先完成或放弃当前目标: ${activeGoals[0].id}`);
     }
 
-    // 生成语义化ID
-    const id = params.id || this.generateId(params.content);
+    // 生成语义化ID：优先使用LLM传入的ID，否则自动生成
+    const id = params.id || this.generateId();
     const uniqueId = this.ensureUniqueId(id);
 
     const goal: Goal = {
@@ -199,55 +199,23 @@ export class GoalManager {
   }
 
   /**
-   * 生成语义化ID
-   * 将中文转为拼音，英文转小写，用下划线连接
+   * 生成ID（当LLM未提供时使用）
+   * 使用时间戳确保唯一性
    */
-  private generateId(content: string): string {
-    // 简单实现：提取字母数字，转小写，用下划线连接
-    // 注意：这里只做简单处理，实际可能需要中文转拼音库
-    let id = content
-      .toLowerCase()
-      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '_')
-      .replace(/^_|_$/g, '');
-
-    // 如果是纯中文，使用简单映射（这里只是示例，实际需要完整的拼音库）
-    if (/[\u4e00-\u9fa5]/.test(id)) {
-      // 简单映射常见词
-      const simpleMap: Record<string, string> = {
-        找到村庄: 'find_village',
-        挖到钻石: 'get_diamond',
-        到达下界: 'reach_nether',
-        建造房子: 'build_house',
-        制作工具: 'craft_tools',
-        收集资源: 'collect_resources',
-        探索世界: 'explore_world',
-      };
-
-      if (simpleMap[content]) {
-        return simpleMap[content];
-      }
-
-      // 如果没有映射，使用goal_加时间戳
-      return `goal_${Date.now()}`;
-    }
-
-    // 限制长度
-    if (id.length > 30) {
-      id = id.substring(0, 30);
-    }
-
-    return id || `goal_${Date.now()}`;
+  private generateId(): string {
+    // 直接使用时间戳，简单可靠
+    return `goal_${Date.now().toString(36)}`;
   }
 
   /**
-   * 确保ID唯一
+   * 确保ID唯一，如果重复则添加序号
    */
   private ensureUniqueId(baseId: string): string {
     if (!this.goals.has(baseId)) {
       return baseId;
     }
 
-    // 添加数字后缀
+    // 添加数字后缀，从2开始
     let counter = 2;
     while (this.goals.has(`${baseId}_${counter}`)) {
       counter++;

@@ -230,7 +230,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         id: {
           type: 'string',
           pattern: '^[a-z][a-z0-9_]*$',
-          description: '语义化ID（如 "find_village", "get_diamond_collect_wood"）。add操作时可选，其他操作必需',
+          description: '语义化ID（如 "find_village", "collect_wood"）。add操作时可选（LLM可传入，否则自动生成），其他操作必需。如果重复会自动添加序号',
         },
         content: {
           type: 'string',

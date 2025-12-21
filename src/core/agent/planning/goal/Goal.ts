@@ -52,6 +52,7 @@ export interface Goal {
  * 创建Goal的参数
  */
 export interface CreateGoalParams {
+  /** LLM传入的语义化ID，可选 */
   id?: string;
   content: string;
   tracker?: Tracker;

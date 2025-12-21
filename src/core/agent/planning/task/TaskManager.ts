@@ -5,7 +5,7 @@
 
 import type { Task, TaskStatus, TaskCompletedBy, CreateTaskParams, UpdateTaskParams } from './Task';
 import type { Tracker } from '../trackers/types';
-import type { GameContext } from '@/core';
+import type { GameContext } from '../../types';
 import { logger } from '@/utils/Logger';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -17,8 +17,8 @@ export class TaskManager {
    * 添加任务
    */
   addTask(params: CreateTaskParams): Task {
-    // 生成语义化ID
-    const id = params.id || this.generateId(params.goalId, params.content);
+    // 生成语义化ID：优先使用LLM传入的ID，否则自动生成
+    const id = params.id || this.generateId();
     const uniqueId = this.ensureUniqueId(id);
 
     const task: Task = {
@@ -98,7 +98,7 @@ export class TaskManager {
     task.updatedAt = Date.now();
     task.completedBy = completedBy;
 
-    logger.success(`[TaskManager] 任务完成: ${id} - ${task.content} (完成方式: ${completedBy})`);
+    logger.info(`[TaskManager] ✅ 任务完成: ${id} - ${task.content} (完成方式: ${completedBy})`);
   }
 
   /**
@@ -201,7 +201,12 @@ export class TaskManager {
         return b.priority - a.priority;
       }
       // 进行中的在前，然后是待处理，最后是已完成
-      const statusOrder = { in_progress: 0, pending: 1, completed: 2 };
+      const statusOrder: Record<string, number> = {
+        in_progress: 0,
+        pending: 1,
+        completed: 2,
+        cancelled: 3
+      };
       return statusOrder[a.status] - statusOrder[b.status];
     });
 
@@ -238,98 +243,23 @@ export class TaskManager {
   }
 
   /**
-   * 生成语义化ID
-   * 格式：goalId + "_" + 关键词
+   * 生成ID（当LLM未提供时使用）
+   * 使用时间戳确保唯一性
    */
-  private generateId(goalId: string, content: string): string {
-    // 简单映射常见词
-    const simpleMap: Record<string, string> = {
-      收集木材: 'collect_wood',
-      收集原木: 'collect_logs',
-      收集圆石: 'collect_cobblestone',
-      收集石头: 'collect_stone',
-      收集铁矿: 'collect_iron',
-      收集煤炭: 'collect_coal',
-      收集钻石: 'collect_diamond',
-      制作工作台: 'craft_table',
-      制作木镐: 'craft_wooden_pickaxe',
-      制作石镐: 'craft_stone_pickaxe',
-      制作铁镐: 'craft_iron_pickaxe',
-      制作钻石镐: 'craft_diamond_pickaxe',
-      制作熔炉: 'craft_furnace',
-      向东探索: 'explore_east',
-      向西探索: 'explore_west',
-      向南探索: 'explore_south',
-      向北探索: 'explore_north',
-      寻找村庄: 'find_village',
-      寻找洞穴: 'find_cave',
-      建造避难所: 'build_shelter',
-    };
-
-    // 优先使用映射表
-    if (simpleMap[content]) {
-      return `${goalId}_${simpleMap[content]}`;
-    }
-
-    // 提取关键词（去除特殊字符）
-    let keywords = content
-      .toLowerCase()
-      .replace(/[^a-z0-9\u4e00-\u9fa5]+/g, '_')
-      .replace(/^_|_$/g, '');
-
-    // 如果包含中文，尝试提取动词+名词的组合
-    if (/[\u4e00-\u9fa5]/.test(keywords)) {
-      // 尝试匹配常见模式
-      const actionMap: Record<string, string> = {
-        收集: 'collect',
-        制作: 'craft',
-        建造: 'build',
-        寻找: 'find',
-        探索: 'explore',
-        前往: 'goto',
-        挖掘: 'mine',
-        种植: 'plant',
-        砍伐: 'chop',
-      };
-
-      // 提取中文部分的前几个字作为关键词
-      const chineseChars = keywords.match(/[\u4e00-\u9fa5]+/g);
-      if (chineseChars && chineseChars.length > 0) {
-        const firstWord = chineseChars[0];
-        // 检查是否包含动作词
-        for (const [cn, en] of Object.entries(actionMap)) {
-          if (firstWord.includes(cn)) {
-            const obj = firstWord.replace(cn, '');
-            if (obj) {
-              keywords = `${en}_${obj}`;
-              break;
-            }
-          }
-        }
-        // 如果仍是中文，使用拼音首字母或简短描述
-        if (/[\u4e00-\u9fa5]/.test(keywords)) {
-          keywords = `task_${firstWord.substring(0, 2)}`;
-        }
-      }
-    }
-
-    // 限制长度
-    if (keywords.length > 20) {
-      keywords = keywords.substring(0, 20);
-    }
-
-    return `${goalId}_${keywords}`;
+  private generateId(): string {
+    // 直接使用时间戳，简单可靠
+    return `task_${Date.now().toString(36)}`;
   }
 
   /**
-   * 确保ID唯一
+   * 确保ID唯一，如果重复则添加序号
    */
   private ensureUniqueId(baseId: string): string {
     if (!this.tasks.has(baseId)) {
       return baseId;
     }
 
-    // 添加数字后缀
+    // 添加数字后缀，从2开始
     let counter = 2;
     while (this.tasks.has(`${baseId}_${counter}`)) {
       counter++;
