@@ -115,14 +115,38 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
       let consecutiveFailures = 0;
       const maxFailures = 5; // 连续失败5次就停止
 
+      // 如果是批量挖掘，一次性查找所有目标方块以避免重复查找同一个位置
+      let targetPositions: Vec3[] = [];
+      if (count > 1 && !direction) {
+        try {
+          targetPositions = context.bot.findBlocks({
+            matching: blockData.id,
+            maxDistance: radius,
+            count: count,
+          });
+          context.logger.info(`找到 ${targetPositions.length} 个目标方块`);
+        } catch (error) {
+          context.logger.warn('查找方块时出错，将使用逐个查找模式');
+        }
+      }
+
       for (let i = 0; i < count; i++) {
         // 检查中断
         context.interruptSignal.throwIfInterrupted();
 
-        // 根据是否有方向参数选择挖掘策略
-        const result = direction
-          ? await this.digWithDirection(context, blockData.id, direction, radius, force, collect)
-          : await this.digNearby(context, blockData.id, radius, force, collect);
+        let result: ActionResult;
+
+        // 根据是否有方向参数或预查找的位置选择挖掘策略
+        if (direction) {
+          // 方向挖掘
+          result = await this.digWithDirection(context, blockData.id, direction, radius, force, collect);
+        } else if (targetPositions.length > 0) {
+          // 使用预查找的位置挖掘
+          result = await this.digAtPosition(context, targetPositions.shift()!, force, collect);
+        } else {
+          // 回退到逐个查找模式
+          result = await this.digNearby(context, blockData.id, radius, force, collect);
+        }
 
         results.push(result);
 
@@ -170,6 +194,23 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
   }
 
   /**
+   * 在指定位置挖掘方块
+   */
+  private async digAtPosition(context: RuntimeContext, position: Vec3, force: boolean, collect: boolean): Promise<ActionResult> {
+    try {
+      const targetBlock = context.bot.blockAt(position);
+      if (!targetBlock || targetBlock.name === 'air') {
+        return this.failure('指定位置没有方块或为空气');
+      }
+
+      return await this.digSingleBlock(context, targetBlock, force, collect);
+    } catch (error) {
+      const err = error as Error;
+      return this.failure(`在指定位置挖掘失败: ${err.message}`, err);
+    }
+  }
+
+  /**
    * 挖掘附近方块
    */
   private async digNearby(context: RuntimeContext, blockId: number, radius: number, force: boolean, collect: boolean): Promise<ActionResult> {
@@ -186,8 +227,8 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
       }
 
       const targetBlock = context.bot.blockAt(blocks[0]);
-      if (!targetBlock) {
-        return this.failure('目标方块不存在');
+      if (!targetBlock || targetBlock.name === 'air') {
+        return this.failure('目标方块不存在或为空气');
       }
 
       return await this.digSingleBlock(context, targetBlock, force, collect);
@@ -227,7 +268,7 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
       // 查找方向上的第一个目标方块
       for (const pos of searchPositions) {
         const block = context.bot.blockAt(pos);
-        if (block && block.type === blockId) {
+        if (block && block.type === blockId && block.name !== 'air') {
           return await this.digSingleBlock(context, block, force, collect);
         }
       }
@@ -244,9 +285,35 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
    */
   private async digSingleBlock(context: RuntimeContext, block: any, force: boolean, collect: boolean): Promise<ActionResult> {
     try {
-      // 安全检查
+      // 空气方块检查
+      if (!block || block.name === 'air') {
+        return this.failure('目标方块为空气，无法挖掘');
+      }
+
+      // 先移动到挖掘位置（移动后再进行安全检查，这样可见性检查才有意义）
+      context.logger.debug(`移动到方块位置: (${block.position.x}, ${block.position.y}, ${block.position.z})`);
+      const moveResult = await context.movementUtils.moveTo(context.bot, {
+        type: 'coordinate',
+        x: block.position.x,
+        y: block.position.y,
+        z: block.position.z,
+        distance: 4, // 挖掘距离
+        maxDistance: 200, // 最大移动距离
+      });
+
+      if (!moveResult.success) {
+        return this.failure(`无法移动到挖掘位置: ${moveResult.message || moveResult.error}`);
+      }
+
+      // 移动完成后，重新获取方块对象（确保状态是最新的）
+      const freshBlock = context.bot.blockAt(block.position);
+      if (!freshBlock || freshBlock.name === 'air') {
+        return this.failure('到达后目标方块已不存在');
+      }
+
+      // 安全检查（在移动后进行）
       if (!force) {
-        const safetyCheck = await this.performSafetyCheck(context, block, block.position);
+        const safetyCheck = await this.performSafetyCheck(context, freshBlock, freshBlock.position);
         if (!safetyCheck.safe) {
           const message = `${safetyCheck.reason}。${safetyCheck.suggestion || ''}`;
           return this.failure(message);
@@ -255,25 +322,25 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
 
       // 工具检查和装备
       if (!force) {
-        const tool = context.bot.pathfinder.bestHarvestTool(block);
+        const tool = context.bot.pathfinder.bestHarvestTool(freshBlock);
         if (tool) {
           await context.bot.equip(tool, 'hand');
-        } else if (block.hardness > 0) {
-          return this.failure(`需要合适工具挖掘: ${block.name}`);
+        } else if (freshBlock.hardness > 0) {
+          return this.failure(`需要合适工具挖掘: ${freshBlock.name}`);
         }
       }
 
       // 执行挖掘
-      await context.bot.dig(block);
+      await context.bot.dig(freshBlock);
 
       // 收集掉落物
       if (collect) {
         await this.collectDrops(context);
       }
 
-      return this.success(`成功挖掘 ${block.name}`, {
-        blockType: block.name,
-        position: { x: block.position.x, y: block.position.y, z: block.position.z },
+      return this.success(`成功挖掘 ${freshBlock.name}`, {
+        blockType: freshBlock.name,
+        position: { x: freshBlock.position.x, y: freshBlock.position.y, z: freshBlock.position.z },
       });
     } catch (error) {
       const err = error as Error;
@@ -344,6 +411,74 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
    */
   private async collectDrops(context: RuntimeContext): Promise<void> {
     try {
+      // 检查是否有 collectBlock 插件
+      if (!(context.bot as any).collectBlock) {
+        context.logger.debug('collectBlock 插件未加载，使用手动收集模式');
+        await this.collectDropsManually(context);
+        return;
+      }
+
+      // 使用 collectBlock 插件自动收集掉落物
+      const droppedItems = Object.values(context.bot.entities).filter(
+        entity => entity.name === 'item' && entity.position.distanceTo(context.bot.entity.position) <= 16,
+      );
+
+      if (droppedItems.length > 0) {
+        context.logger.debug(`发现 ${droppedItems.length} 个掉落物，使用 collectBlock 插件收集`);
+
+        // 使用 collectBlock 插件收集所有掉落物，过滤 "Collect finish!" 消息
+        await this.collectBlockSilently(context, droppedItems);
+
+        context.logger.debug(`使用 collectBlock 插件收集完成`);
+      }
+    } catch (error) {
+      context.logger.debug('使用 collectBlock 插件收集时出错，回退到手动模式:', error);
+      // 如果插件收集失败，回退到手动收集
+      await this.collectDropsManually(context);
+    }
+  }
+
+  /**
+   * 无消息收集方块 - 阻止 collectBlock 插件发送完成消息
+   * 参考 maicraft-mcp-server 项目的实现
+   */
+  private async collectBlockSilently(context: RuntimeContext, targets: any[]): Promise<void> {
+    const originalChat = context.bot.chat?.bind(context.bot);
+    const originalWhisper = context.bot.whisper?.bind(context.bot);
+    const filteredMessages = ['Collect finish!'];
+
+    // 临时禁用聊天消息输出
+    const tempChat = (message: string) => {
+      if (!filteredMessages.some(filtered => message.includes(filtered))) {
+        originalChat?.(message);
+      }
+    };
+
+    const tempWhisper = (username: string, message: string) => {
+      if (!filteredMessages.some(filtered => message.includes(filtered))) {
+        originalWhisper?.(username, message);
+      }
+    };
+
+    // 临时替换方法
+    if (context.bot.chat) context.bot.chat = tempChat;
+    if (context.bot.whisper) context.bot.whisper = tempWhisper;
+
+    try {
+      // 执行收集操作
+      await (context.bot as any).collectBlock.collect(targets);
+    } finally {
+      // 恢复原始方法
+      if (context.bot.chat) context.bot.chat = originalChat;
+      if (context.bot.whisper) context.bot.whisper = originalWhisper;
+    }
+  }
+
+  /**
+   * 手动收集掉落物（备用方法）
+   */
+  private async collectDropsManually(context: RuntimeContext): Promise<void> {
+    try {
       const droppedItems = Object.values(context.bot.entities).filter(
         entity => entity.name === 'item' && entity.position.distanceTo(context.bot.entity.position) <= 5,
       );
@@ -361,7 +496,7 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
         }
       }
     } catch (error) {
-      context.logger.debug('收集掉落物时出错:', error);
+      context.logger.debug('手动收集掉落物时出错:', error);
     }
   }
 

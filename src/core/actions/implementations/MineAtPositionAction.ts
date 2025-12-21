@@ -109,9 +109,26 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
 
       context.logger.debug(`目标方块: ${block.name} at (${block.position.x}, ${block.position.y}, ${block.position.z})`);
 
-      // 2. 安全检查
+      // 2. 移动到挖掘位置
+      if (context.bot.entity.position.distanceTo(position) > 4) {
+        context.logger.debug(`移动到目标位置: (${position.x}, ${position.y}, ${position.z})`);
+        try {
+          await context.bot.pathfinder.goto(new goals.GoalBlock(position.x, position.y, position.z));
+        } catch (error) {
+          const err = error as Error;
+          return this.failure(`无法移动到目标位置: ${err.message}`);
+        }
+      }
+
+      // 3. 移动后重新获取方块状态
+      const freshBlock = context.bot.blockAt(position);
+      if (!freshBlock || freshBlock.name === 'air') {
+        return this.failure('到达后目标方块已不存在');
+      }
+
+      // 4. 安全检查（在移动后进行）
       if (!force) {
-        const safetyCheck = await this.performSafetyCheck(context, block, position);
+        const safetyCheck = await this.performSafetyCheck(context, freshBlock, position);
         if (!safetyCheck.safe) {
           const message = `${safetyCheck.reason}。${safetyCheck.suggestion || ''}`;
           return this.failure(message);
@@ -120,26 +137,26 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
         context.logger.debug('跳过安全检查（强制模式）');
       }
 
-      // 3. 工具检查和装备（仅在非强制模式）
+      // 5. 工具检查和装备（仅在非强制模式）
       if (!force) {
-        const toolResult = await this.equipBestTool(context, block);
+        const toolResult = await this.equipBestTool(context, freshBlock);
         if (!toolResult.success) {
           return this.failure(toolResult.message);
         }
       }
 
-      // 4. 执行挖掘
-      context.logger.debug(`开始挖掘 ${block.name}`);
-      await context.bot.dig(block);
+      // 6. 执行挖掘
+      context.logger.debug(`开始挖掘 ${freshBlock.name}`);
+      await context.bot.dig(freshBlock);
 
-      // 5. 收集掉落物（可选）
+      // 7. 收集掉落物（可选）
       if (collect) {
         await this.collectDrops(context);
       }
 
-      return this.success(`成功挖掘 ${block.name}`, {
-        blockType: block.name,
-        position: { x: block.position.x, y: block.position.y, z: block.position.z },
+      return this.success(`成功挖掘 ${freshBlock.name}`, {
+        blockType: freshBlock.name,
+        position: { x: freshBlock.position.x, y: freshBlock.position.y, z: freshBlock.position.z },
       });
     } catch (error) {
       const err = error as Error;
@@ -227,13 +244,79 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
    */
   private async collectDrops(context: RuntimeContext): Promise<void> {
     try {
+      // 检查是否有 collectBlock 插件
+      if (!(context.bot as any).collectBlock) {
+        context.logger.debug('collectBlock 插件未加载，使用手动收集模式');
+        await this.collectDropsManually(context);
+        return;
+      }
+
+      // 使用 collectBlock 插件自动收集掉落物
+      const droppedItems = Object.values(context.bot.entities).filter(
+        entity => entity.name === 'item' && entity.position.distanceTo(context.bot.entity.position) <= 16,
+      );
+
+      if (droppedItems.length > 0) {
+        context.logger.debug(`发现 ${droppedItems.length} 个掉落物，使用 collectBlock 插件收集`);
+
+        // 使用 collectBlock 插件收集所有掉落物，过滤 "Collect finish!" 消息
+        await this.collectBlockSilently(context, droppedItems);
+
+        context.logger.debug(`使用 collectBlock 插件收集完成`);
+      }
+    } catch (error) {
+      context.logger.debug('使用 collectBlock 插件收集时出错，回退到手动模式:', error);
+      // 如果插件收集失败，回退到手动收集
+      await this.collectDropsManually(context);
+    }
+  }
+
+  /**
+   * 无消息收集方块 - 阻止 collectBlock 插件发送完成消息
+   * 参考 maicraft-mcp-server 项目的实现
+   */
+  private async collectBlockSilently(context: RuntimeContext, targets: any[]): Promise<void> {
+    const originalChat = context.bot.chat?.bind(context.bot);
+    const originalWhisper = context.bot.whisper?.bind(context.bot);
+    const filteredMessages = ["Collect finish!"];
+
+    // 临时禁用聊天消息输出
+    const tempChat = (message: string) => {
+      if (!filteredMessages.some(filtered => message.includes(filtered))) {
+        originalChat?.(message);
+      }
+    };
+
+    const tempWhisper = (username: string, message: string) => {
+      if (!filteredMessages.some(filtered => message.includes(filtered))) {
+        originalWhisper?.(username, message);
+      }
+    };
+
+    // 临时替换方法
+    if (context.bot.chat) context.bot.chat = tempChat;
+    if (context.bot.whisper) context.bot.whisper = tempWhisper;
+
+    try {
+      // 执行收集操作
+      await (context.bot as any).collectBlock.collect(targets);
+    } finally {
+      // 恢复原始方法
+      if (context.bot.chat) context.bot.chat = originalChat;
+      if (context.bot.whisper) context.bot.whisper = originalWhisper;
+    }
+  }
+
+  /**
+   * 手动收集掉落物（备用方法）
+   */
+  private async collectDropsManually(context: RuntimeContext): Promise<void> {
+    try {
       const droppedItems = Object.values(context.bot.entities).filter(
         entity => entity.name === 'item' && entity.position.distanceTo(context.bot.entity.position) <= 5,
       );
 
       if (droppedItems.length > 0) {
-        context.logger.debug(`收集 ${droppedItems.length} 个掉落物`);
-
         for (const item of droppedItems) {
           try {
             // 简单的移动到掉落物附近来收集
@@ -248,7 +331,7 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
         }
       }
     } catch (error) {
-      context.logger.debug('收集掉落物时出错:', error);
+      context.logger.debug('手动收集掉落物时出错:', error);
       // 不让收集失败影响主要功能
     }
   }
