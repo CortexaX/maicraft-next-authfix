@@ -19,8 +19,9 @@ export class GoalManager {
     // 检查是否已有活动目标
     const activeGoals = this.getActiveGoals();
     if (activeGoals.length > 0) {
+      const activeGoalDetails = activeGoals.map(g => `[${g.id}] ${g.content}`).join(', ');
       logger.warn(`[GoalManager] 已有 ${activeGoals.length} 个活动目标，不允许添加新目标`);
-      logger.warn(`[GoalManager] 当前活动目标: ${activeGoals.map(g => `[${g.id}] ${g.content}`).join(', ')}`);
+      logger.warn(`[GoalManager] 当前活动目标: ${activeGoalDetails}`);
       throw new Error(`已有活动目标，请先完成或放弃当前目标: ${activeGoals[0].id}`);
     }
 
@@ -151,6 +152,13 @@ export class GoalManager {
    */
   getActiveGoals(): Goal[] {
     return Array.from(this.goals.values()).filter(goal => goal.status === 'active');
+  }
+
+  /**
+   * 获取所有目标（用于历史记录）
+   */
+  getAllGoals(): Goal[] {
+    return Array.from(this.goals.values());
   }
 
   /**

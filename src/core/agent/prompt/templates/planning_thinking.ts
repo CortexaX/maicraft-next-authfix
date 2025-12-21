@@ -15,8 +15,13 @@ export function initPlanningThinkingTemplate(): void {
 
 你需要为以下目标制定具体的任务计划：
 
-**当前目标**：
+## 目标状态
+
+**当前活动目标**：
 {current_goal}
+
+**目标历史**（最近的目标和完成情况）：
+{goal_history}
 
 ## 当前状态
 
@@ -36,10 +41,15 @@ export function initPlanningThinkingTemplate(): void {
 
 ## 你的任务
 
-请分析当前目标，并使用\`plan_action\`动作来创建具体的任务。
+请分析当前目标和历史情况，并使用\`plan_action\`动作来制定合适的计划。
+
+**重要提醒**：
+- 查看目标历史，了解最近完成的目标和新创建的目标
+- 如果当前目标是刚创建的，通常只需要为其创建任务，而不是创建新目标
+- 专注于为当前活动目标制定具体的执行任务
 
 **注意**：
-1. 如果已有任务列表不为空，请评估现有任务是否足够完成目标
+1. 如果已有任务列表不为空，请评估现有任务是否足够完成当前目标
 2. 如果现有任务已经足够，可以不创建新任务（或只做微调）
 3. 如果需要补充任务，请创建具体、可执行的任务
 4. 每个任务应该尽可能简单，理想情况下用一个动作就能完成
@@ -53,7 +63,7 @@ export function initPlanningThinkingTemplate(): void {
 5. 说明任务的优先级和依赖关系
 
 现在开始你的规划！`,
-      ['current_goal', 'task_list', 'inventory', 'position', 'health', 'planning_round', 'max_rounds'],
+      ['current_goal', 'goal_history', 'task_list', 'inventory', 'position', 'health', 'planning_round', 'max_rounds'],
     ),
   );
 }

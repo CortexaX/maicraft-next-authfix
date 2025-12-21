@@ -200,10 +200,14 @@ export class PlanningMode extends BaseMode {
     const activeTasks = taskManager?.getActiveTasks(currentGoal.id) || [];
     const taskList = activeTasks.length > 0 ? taskManager!.formatTasks(currentGoal.id, { gameState } as any) : '无任务';
 
+    // 生成目标历史信息
+    const goalHistory = this.generateGoalHistory(currentGoal);
+
     // 构建提示词数据
     const promptData = {
       bot_name: gameState.playerName || 'Bot',
       current_goal: `🎯 [${currentGoal.id}] ${currentGoal.content}`,
+      goal_history: goalHistory,
       task_list: taskList,
       inventory: gameState.getInventoryDescription(),
       position: `(${gameState.position?.x.toFixed(1)}, ${gameState.position?.y.toFixed(1)}, ${gameState.position?.z.toFixed(1)})`,
@@ -214,6 +218,67 @@ export class PlanningMode extends BaseMode {
     };
 
     return promptManager.generatePrompt('planning_thinking', promptData);
+  }
+
+  /**
+   * 生成目标历史信息
+   */
+  private generateGoalHistory(currentGoal: any): string {
+    const goalManager = this.state!.context.goalManager;
+    if (!goalManager) {
+      return '无目标历史信息';
+    }
+
+    // 获取所有目标，包括已完成和已放弃的
+    const allGoals = goalManager.getAllGoals();
+
+    // 按时间排序，显示最近的目标
+    const sortedGoals = allGoals
+      .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
+      .slice(0, 5); // 只显示最近5个目标
+
+    if (sortedGoals.length === 0) {
+      return '无目标历史信息';
+    }
+
+    const historyLines: string[] = [];
+    for (const goal of sortedGoals) {
+      const statusIcon = goal.status === 'completed' ? '✅' :
+                         goal.status === 'abandoned' ? '❌' :
+                         goal.status === 'active' ? '🎯' : '❓';
+
+      const timeInfo = this.formatGoalTime(goal);
+      const completedInfo = goal.completedAt ? ` (完成于 ${timeInfo})` : '';
+
+      historyLines.push(`${statusIcon} [${goal.id}] ${goal.content}${completedInfo}`);
+    }
+
+    return historyLines.join('\n');
+  }
+
+  /**
+   * 格式化目标时间信息
+   */
+  private formatGoalTime(goal: any): string {
+    const timestamp = goal.completedAt || goal.createdAt || Date.now();
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) {
+      return '刚刚';
+    } else if (diffMins < 60) {
+      return `${diffMins}分钟前`;
+    } else {
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) {
+        return `${diffHours}小时前`;
+      } else {
+        const diffDays = Math.floor(diffHours / 24);
+        return `${diffDays}天前`;
+      }
+    }
   }
 
   /**
