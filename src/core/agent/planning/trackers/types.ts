@@ -8,8 +8,9 @@
  *   - EntityTracker: 实体状态
  *   - EnvironmentTracker: 环境状态
  *
- * - ActionTracker（动作型）：检查是否执行了特定动作
- *   - CraftTracker: 制作动作
+ * - EventTracker（事件型）：基于事件追踪动作
+ *   - CollectionTracker: 收集物品事件（基于 playerCollect）
+ *   - CraftTracker: 制作物品事件（基于背包增量检测）
  *
  * - CompositeTracker（组合型）：组合多个Tracker
  *   - logic: 'and' | 'or' | 'sequence'
@@ -71,17 +72,23 @@ export interface Tracker {
    * @returns JSON对象
    */
   toJSON(): any;
+
+  /**
+   * 清理资源（用于事件型Tracker）
+   * 可选方法，用于移除事件监听器等资源
+   */
+  destroy?(): void;
 }
 
+
 /**
- * InventoryTracker配置
+ * CollectionTracker配置
+ * 基于 playerCollect 事件追踪新收集的物品
  */
-export interface InventoryTrackerConfig {
-  type: 'inventory';
+export interface CollectionTrackerConfig {
+  type: 'collection';
   itemName: string;
   targetCount: number;
-  minCount?: number; // 最小数量（用于范围检查）
-  maxCount?: number; // 最大数量（用于范围检查）
 }
 
 /**
@@ -143,7 +150,7 @@ export interface CompositeTrackerConfig {
  * 所有Tracker配置的联合类型
  */
 export type TrackerConfig =
-  | InventoryTrackerConfig
+  | CollectionTrackerConfig
   | LocationTrackerConfig
   | EntityTrackerConfig
   | EnvironmentTrackerConfig

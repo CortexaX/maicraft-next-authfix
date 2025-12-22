@@ -79,6 +79,9 @@ export class TaskManager {
       return;
     }
 
+    // 清理 Tracker 资源（如事件监听器）
+    task.tracker?.destroy?.();
+
     this.tasks.delete(id);
     logger.info(`[TaskManager] 删除任务: ${id} - ${task.content}`);
   }
@@ -92,6 +95,9 @@ export class TaskManager {
       logger.warn(`[TaskManager] 任务不存在: ${id}`);
       return;
     }
+
+    // 清理 Tracker 资源（如事件监听器）
+    task.tracker?.destroy?.();
 
     task.status = 'completed';
     task.completedAt = Date.now();
@@ -143,7 +149,7 @@ export class TaskManager {
             this.completeTask(task.id, 'tracker');
           }
         } catch (error) {
-          logger.error(`[TaskManager] 检测任务完成时出错: ${task.id}`, error);
+          logger.error(`[TaskManager] 检测任务完成时出错: ${task.id}`, {}, error instanceof Error ? error : new Error(String(error)));
         }
       }
     }
@@ -205,7 +211,7 @@ export class TaskManager {
         in_progress: 0,
         pending: 1,
         completed: 2,
-        cancelled: 3
+        cancelled: 3,
       };
       return statusOrder[a.status] - statusOrder[b.status];
     });
@@ -275,6 +281,8 @@ export class TaskManager {
     const tasksToRemove = Array.from(this.tasks.values()).filter(task => task.goalId === goalId);
 
     for (const task of tasksToRemove) {
+      // 清理 Tracker 资源（如事件监听器）
+      task.tracker?.destroy?.();
       this.tasks.delete(task.id);
     }
 
@@ -331,7 +339,7 @@ export class TaskManager {
       await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf-8');
       logger.debug('[TaskManager] 任务数据已保存');
     } catch (error) {
-      logger.error('[TaskManager] 保存任务数据失败:', error);
+      logger.error('[TaskManager] 保存任务数据失败:', {}, error instanceof Error ? error : new Error(String(error)));
     }
   }
 

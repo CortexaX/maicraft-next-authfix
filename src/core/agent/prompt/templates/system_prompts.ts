@@ -242,9 +242,9 @@ action对象必须包含：
 - 如果历史显示"附近无工作台"，确保先放置工作台或移动到工作台附近
 
 # 可用追踪器类型
-1. inventory - 物品收集任务
-   - 参数: itemName (物品名称), targetCount (目标数量), exact (是否精确，可选)
-   - 示例: { "type": "inventory", "itemName": "stone", "targetCount": 64, "exact": false }
+1. collection - 物品收集任务
+   - 参数: itemName (物品名称), targetCount (目标数量)
+   - 示例: { "type": "collection", "itemName": "stone", "targetCount": 64 }
 
 2. craft - 合成任务
    - 参数: itemName (目标物品名称), targetCount (目标数量)
@@ -278,10 +278,9 @@ action对象必须包含：
       "title": "任务1标题",
       "description": "任务1详细描述",
       "tracker": {
-        "type": "inventory",
+        "type": "collection",
         "itemName": "oak_log",
-        "targetCount": 4,
-        "exact": false
+        "targetCount": 4
       },
       "dependencies": []
     },
@@ -302,7 +301,7 @@ action对象必须包含：
 **注意事项**：
 - dependencies 数组中填写依赖任务的索引（从0开始）
 - tracker 必须是上述可用类型之一
-- **字段名必须精确匹配**：inventory 用 itemName/targetCount，location 用 targetX/targetY/targetZ
+- **字段名必须精确匹配**：collection 用 itemName/targetCount，location 用 targetX/targetY/targetZ
 - 所有数值类型的参数（如 targetCount, targetX 等）必须是数字，不能是字符串
 - itemName 必须使用 Minecraft 内部名称（如 oak_log, stone, iron_ore）`,
       '规划生成系统提示词',

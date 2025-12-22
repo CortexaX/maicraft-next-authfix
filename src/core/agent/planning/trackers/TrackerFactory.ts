@@ -3,13 +3,14 @@
  * 用于创建和反序列化追踪器
  *
  * 支持的Tracker类型：
- * - 状态型：inventory, location, entity, environment
- * - 动作型：craft
+ * - 状态型：location, entity, environment
+ * - 事件型：collection, craft
  * - 组合型：composite
  */
 
 import type { Tracker, TrackerConfig, ITrackerFactory } from './types';
-import { InventoryTracker } from './InventoryTracker';
+import type { EventManager } from '@/core/events/EventManager';
+import { CollectionTracker } from './CollectionTracker';
 import { LocationTracker } from './LocationTracker';
 import { CraftTracker } from './CraftTracker';
 import { EntityTracker } from './EntityTracker';
@@ -17,14 +18,18 @@ import { EnvironmentTracker } from './EnvironmentTracker';
 import { CompositeTracker } from './CompositeTracker';
 
 export class TrackerFactory implements ITrackerFactory {
-  private trackers: Map<string, any> = new Map([
-    ['inventory', InventoryTracker],
-    ['location', LocationTracker],
-    ['craft', CraftTracker],
-    ['entity', EntityTracker],
-    ['environment', EnvironmentTracker],
-    ['composite', CompositeTracker],
-  ]);
+  private trackers: Map<string, any>;
+
+  constructor(private eventManager: EventManager) {
+    this.trackers = new Map<string, any>([
+      ['collection', CollectionTracker],
+      ['location', LocationTracker],
+      ['craft', CraftTracker],
+      ['entity', EntityTracker],
+      ['environment', EnvironmentTracker],
+      ['composite', CompositeTracker],
+    ]);
+  }
 
   /**
    * 注册自定义追踪器
@@ -55,6 +60,11 @@ export class TrackerFactory implements ITrackerFactory {
       return CompositeTracker.fromJSON(json, this);
     }
 
+    // CollectionTracker 需要注入 eventManager
+    if (json.type === 'collection') {
+      return CollectionTracker.fromJSON(json, this.eventManager);
+    }
+
     return TrackerClass.fromJSON(json);
   }
 
@@ -68,10 +78,10 @@ export class TrackerFactory implements ITrackerFactory {
   /**
    * 兼容旧代码的静态方法
    * @deprecated 使用DI容器：container.resolve(ServiceKeys.TrackerFactory).fromJSON(json)
+   * 注意：静态方法无法获取 eventManager，CollectionTracker 无法使用
    */
   static fromJSON(json: any): Tracker {
-    const factory = new TrackerFactory();
-    return factory.fromJSON(json);
+    throw new Error('TrackerFactory.fromJSON 已废弃，请使用 DI 容器获取 TrackerFactory 实例');
   }
 
   /**
@@ -79,8 +89,7 @@ export class TrackerFactory implements ITrackerFactory {
    * @deprecated 使用DI容器
    */
   static register(type: string, trackerClass: any): void {
-    const factory = new TrackerFactory();
-    factory.register(type, trackerClass);
+    throw new Error('TrackerFactory.register 已废弃，请使用 DI 容器获取 TrackerFactory 实例');
   }
 
   /**
@@ -88,7 +97,6 @@ export class TrackerFactory implements ITrackerFactory {
    * @deprecated 使用DI容器
    */
   static getRegisteredTypes(): string[] {
-    const factory = new TrackerFactory();
-    return factory.getRegisteredTypes();
+    throw new Error('TrackerFactory.getRegisteredTypes 已废弃，请使用 DI 容器获取 TrackerFactory 实例');
   }
 }

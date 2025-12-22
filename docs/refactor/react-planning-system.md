@@ -183,7 +183,7 @@ src/core/agent/planning/
 │   └── TaskManager.ts       # 管理器：增删改查、自动检测、格式化
 └── trackers/                # 保留现有位置
     ├── types.ts             # Tracker 接口和进度类型
-    ├── InventoryTracker.ts  # 重新设计
+    ├── CollectionTracker.ts # 基于事件的新收集追踪器
     ├── LocationTracker.ts   # 重新设计
     ├── EntityTracker.ts     # 新增
     ├── EnvironmentTracker.ts # 新增
@@ -315,13 +315,16 @@ interface Task {
 Tracker (基类)
 │
 ├── StateTracker（状态型 - 检查状态是否达成）
-│   ├── InventoryTracker      # 背包物品状态
 │   ├── LocationTracker        # 位置状态
 │   ├── EntityTracker          # 实体状态（新增）
 │   └── EnvironmentTracker     # 环境状态（新增）
 │
-├── ActionTracker（动作型 - 检查是否执行了动作）
-│   └── CraftTracker           # 制作动作
+├── EventTracker（事件型 - 基于事件追踪动作）
+│   ├── CollectionTracker      # 收集物品事件
+│   └── CraftTracker           # 制作物品事件
+│
+├── CompositeTracker（组合型 - 组合多个Tracker）
+│   └── 逻辑组合（AND/OR/Sequence）
 │
 └── CompositeTracker（组合型 - 组合多个 Tracker）
     └── logic: 'and' | 'or' | 'sequence'

@@ -107,7 +107,7 @@ export class PromptDataCollector {
 
 示例：
 添加目标：{"type": "goal", "operation": "add", "content": "收集基础资源", "priority": 5}
-添加任务：{"type": "task", "operation": "add", "goalId": "collect_basic_resources", "content": "收集20个橡木原木", "tracker": {"type": "inventory", "itemName": "oak_log", "targetCount": 20}}`;
+添加任务：{"type": "task", "operation": "add", "goalId": "collect_basic_resources", "content": "收集20个橡木原木", "tracker": {"type": "collection", "itemName": "oak_log", "targetCount": 20}}`;
       task_list = '';
       goal_completed_hint = '';
     } else {

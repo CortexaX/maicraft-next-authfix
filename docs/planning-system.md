@@ -445,17 +445,17 @@ interface TaskStats {
 
 ### 内置追踪器类型
 
-#### 1. InventoryTracker - 物品栏追踪
+#### 1. CollectionTracker - 物品收集追踪
 
 ```typescript
 {
-  type: 'inventory',
-  item: 'iron_ore',
-  count: 10
+  type: 'collection',
+  itemName: 'iron_ore',
+  targetCount: 10
 }
 ```
 
-检查物品栏中是否有指定数量的物品。
+基于 playerCollect 事件追踪新收集的物品数量（不包括背包中已有的物品）。
 
 #### 2. LocationTracker - 位置追踪
 
@@ -1472,7 +1472,11 @@ async function createMiningPlan(planningManager: GoalPlanningManager) {
       new Task({
         title: '收集钻石矿石',
         description: '挖掘并收集钻石矿石',
-        tracker: new InventoryTracker('diamond_ore', 5),
+        tracker: trackerFactory.createTracker({
+          type: 'collection',
+          itemName: 'diamond_ore',
+          targetCount: 5
+        }),
       }),
     ],
   });

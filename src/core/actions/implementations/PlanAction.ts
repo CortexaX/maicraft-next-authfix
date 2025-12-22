@@ -45,11 +45,8 @@ export class PlanAction extends BaseAction<PlanActionParams> {
   readonly name = '规划管理';
   readonly description = '管理目标和任务的规划。可以添加、编辑、删除、完成目标或任务。';
 
-  private trackerFactory: TrackerFactory;
-
-  constructor() {
-    super();
-    this.trackerFactory = new TrackerFactory();
+  private getTrackerFactory(context: RuntimeContext): TrackerFactory {
+    return new TrackerFactory(context.events);
   }
 
   async execute(context: RuntimeContext, params: PlanActionParams): Promise<ActionResult> {
@@ -81,7 +78,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         }
 
         // 创建Tracker（如果提供）
-        const tracker = params.tracker ? this.trackerFactory.createTracker(params.tracker) : undefined;
+        const tracker = params.tracker ? this.getTrackerFactory(context).createTracker(params.tracker) : undefined;
 
         const goal = goalManager.addGoal({
           id: params.id,
@@ -103,7 +100,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         if (params.content !== undefined) updates.content = params.content;
         if (params.priority !== undefined) updates.priority = params.priority;
         if (params.tracker !== undefined) {
-          updates.tracker = this.trackerFactory.createTracker(params.tracker);
+          updates.tracker = this.getTrackerFactory(context).createTracker(params.tracker);
         }
         if (params.metadata !== undefined) updates.metadata = params.metadata;
 
@@ -153,7 +150,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         }
 
         // 创建Tracker（如果提供）
-        const tracker = params.tracker ? this.trackerFactory.createTracker(params.tracker) : undefined;
+        const tracker = params.tracker ? this.getTrackerFactory(context).createTracker(params.tracker) : undefined;
 
         const task = taskManager.addTask({
           id: params.id,
@@ -176,7 +173,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         if (params.content !== undefined) updates.content = params.content;
         if (params.priority !== undefined) updates.priority = params.priority;
         if (params.tracker !== undefined) {
-          updates.tracker = this.trackerFactory.createTracker(params.tracker);
+          updates.tracker = this.getTrackerFactory(context).createTracker(params.tracker);
         }
         if (params.metadata !== undefined) updates.metadata = params.metadata;
 
@@ -246,17 +243,17 @@ export class PlanAction extends BaseAction<PlanActionParams> {
           properties: {
             type: {
               type: 'string',
-              enum: ['inventory', 'location', 'entity', 'environment', 'craft', 'composite'],
-              description: 'Tracker类型：inventory=背包物品, location=位置, entity=实体, environment=环境, craft=制作, composite=组合',
+              enum: ['collection', 'location', 'entity', 'environment', 'craft', 'composite'],
+              description: 'Tracker类型：collection=收集物品, location=位置, entity=实体, environment=环境, craft=制作, composite=组合',
             },
-            // inventory
+            // collection
             itemName: {
               type: 'string',
-              description: '物品名称（inventory/craft需要）',
+              description: '物品名称（collection/craft需要）',
             },
             targetCount: {
               type: 'number',
-              description: '目标数量（inventory/craft需要）',
+              description: '目标数量（collection/craft需要）',
             },
             // location
             x: { type: 'number', description: 'X坐标（location需要）' },

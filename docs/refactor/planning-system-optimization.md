@@ -195,10 +195,10 @@ interface StructureFeature {
 }
 ```
 
-**5. EnhancedInventoryTracker - 增强物品追踪**
+**5. EnhancedCollectionTracker - 增强物品收集追踪**
 ```typescript
-interface EnhancedInventoryTracker {
-  type: "enhanced_inventory"
+interface EnhancedCollectionTracker {
+  type: "enhanced_collection"
   target: {
     item: string
     count: number
@@ -472,7 +472,7 @@ const decisionLoop = {
 
 **任务清单**：
 1. 重构Tracker基类，增加CompletionResult返回类型 (3天)
-2. 实现SmartInventoryTracker (4天)
+2. 实现SmartCollectionTracker (4天)
 3. 实现SmartLocationTracker (4天)
 4. 实现SmartCraftTracker (4天)
 5. 编写Tracker单元测试 (3天)

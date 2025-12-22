@@ -119,8 +119,9 @@ export class Agent {
 
       // 加载目标和任务持久化数据
       if (this.state.context.goalManager && this.state.context.taskManager) {
+        const context = this.executor.getContextManager().getContext();
         const { TrackerFactory } = await import('@/core/agent/planning/trackers/TrackerFactory');
-        const trackerFactory = new TrackerFactory();
+        const trackerFactory = new TrackerFactory(context.eventManager);
 
         await this.state.context.goalManager.load('./data', trackerFactory);
         await this.state.context.taskManager.load('./data', trackerFactory);

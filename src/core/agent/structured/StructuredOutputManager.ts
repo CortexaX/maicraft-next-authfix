@@ -236,7 +236,7 @@ export class StructuredOutputManager {
       "title": "任务标题",
       "description": "任务描述",
       "tracker": {
-        "type": "inventory",
+        "type": "collection",
         "itemName": "物品名称",
         "targetCount": 数字
       },

@@ -526,7 +526,7 @@ export const PLAN_GENERATION_SCHEMA = {
             properties: {
               type: {
                 type: 'string',
-                enum: ['inventory', 'craft', 'location', 'composite'],
+                enum: ['collection', 'craft', 'location', 'composite'],
                 description: '追踪器类型',
               },
             },
@@ -534,10 +534,9 @@ export const PLAN_GENERATION_SCHEMA = {
             oneOf: [
               {
                 properties: {
-                  type: { const: 'inventory' },
+                  type: { const: 'collection' },
                   itemName: { type: 'string', description: '物品名称（游戏内部名称）' },
                   targetCount: { type: 'number', description: '目标数量', minimum: 1 },
-                  exact: { type: 'boolean', description: '是否需要精确数量', default: false },
                 },
                 required: ['type', 'itemName', 'targetCount'],
               },

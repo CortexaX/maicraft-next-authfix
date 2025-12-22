@@ -35,15 +35,15 @@ export type {
   Tracker,
   TrackerProgress,
   TrackerConfig,
-  InventoryTrackerConfig,
   LocationTrackerConfig,
   EntityTrackerConfig,
   EnvironmentTrackerConfig,
   CraftTrackerConfig,
+  CollectionTrackerConfig,
   CompositeTrackerConfig,
   ITrackerFactory,
 } from './planning/trackers/types';
-export { InventoryTracker } from './planning/trackers/InventoryTracker';
+export { CollectionTracker } from './planning/trackers/CollectionTracker';
 export { LocationTracker } from './planning/trackers/LocationTracker';
 export { CraftTracker } from './planning/trackers/CraftTracker';
 export { EntityTracker } from './planning/trackers/EntityTracker';

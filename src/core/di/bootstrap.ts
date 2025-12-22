@@ -306,7 +306,8 @@ export function configureServices(container: Container): void {
   // TrackerFactory (单例)
   container.registerSingleton(ServiceKeys.TrackerFactory, c => {
     const { TrackerFactory } = require('@/core/agent/planning/trackers/TrackerFactory');
-    return new TrackerFactory();
+    const eventManager = c.resolve(ServiceKeys.EventManager);
+    return new TrackerFactory(eventManager);
   });
 
   // LoggerFactory (单例)

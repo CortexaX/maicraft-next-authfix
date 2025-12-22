@@ -153,6 +153,15 @@ export class EventManager {
       }
     });
 
+    // 玩家收集物品事件
+    this.bot.on('playerCollect', (collector, collected) => {
+      // 只追踪机器人自己收集的物品
+      const isSelf = this.bot.entity && collector.id === this.bot.entity.id;
+      if (isSelf) {
+        this.emit('playerCollect', { collector, collected });
+      }
+    });
+
     // 错误事件
     this.bot.on('error', error => {
       this.emit('error', { error });

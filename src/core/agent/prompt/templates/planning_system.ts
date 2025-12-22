@@ -37,7 +37,7 @@ export function initPlanningSystemTemplate(): void {
    - 优先级应该反映任务的紧急程度和重要性
 
 3. **Tracker 选择**：
-   - **ItemTracker**：收集物品相关任务（如"收集8个原木"）
+   - **CollectionTracker**：收集物品相关任务（如"收集8个原木"）
    - **BlockTracker**：寻找方块相关任务（如"找到铁矿石"）
    - **CraftTracker**：制作物品相关任务（如"制作工作台"）
    - **LocationTracker**：移动到特定位置（如"到达坐标(100, 64, 200)"）
