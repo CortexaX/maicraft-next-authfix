@@ -78,6 +78,8 @@ export class Agent {
     // Initialize ReActAgent if using ReAct mode
     if (this.useReActMode) {
       this.reactAgent = new ReActAgent(this.state);
+      // Also set on state so MainDecisionLoop can access it
+      (this.state as any).reactAgent = this.reactAgent;
     }
 
     // 初始化数据收集器
