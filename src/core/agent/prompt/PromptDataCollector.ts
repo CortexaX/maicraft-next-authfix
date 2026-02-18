@@ -136,7 +136,7 @@ export class PromptDataCollector {
       entity_search_distance: gameState.entitySearchDistance || 16, // 实体搜索距离
       nearby_entities_info: gameState.getNearbyEntitiesDescription?.() || '无',
       chat_str: this.getChatHistory(),
-      mode: this.state.modeManager.getCurrentMode(),
+      mode: 'react', // ReAct 模式
       task: '', // 新系统中不再有单一currentTask
     };
   }

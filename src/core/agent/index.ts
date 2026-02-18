@@ -5,14 +5,15 @@
 export { Agent } from './Agent';
 export { InterruptController } from './InterruptController';
 export { MemoryManager } from './memory/MemoryManager';
-export { ModeManager } from './mode/ModeManager';
-export { ModeType } from './mode/types';
 export { MainDecisionLoop } from './loop/MainDecisionLoop';
 export { ChatLoop } from './loop/ChatLoop';
 
+// ReAct Architecture
+export { ReActAgent, ReActHistory, PlanningChecker, UrgentChecker, ObservationCollector } from './react';
+export type { Observation, RetrievedMemories, ReActEntry, ActionResult } from './react';
+
 // Types
 export type { AgentState, AgentStatus, ActionCall, GameContext } from './types';
-export type { ModeTransitionRule } from './mode/types';
 export type {
   MemoryStore,
   ThoughtEntry,

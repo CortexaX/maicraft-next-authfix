@@ -17,6 +17,8 @@ import { initPlanGenerationTemplate } from './plan_generation';
 import { initGoalGenerationTemplate } from './goal_generation';
 import { initPlanningSystemTemplate } from './planning_system';
 import { initPlanningThinkingTemplate } from './planning_thinking';
+import { initReActThinkingTemplate } from './react_thinking';
+import { initReActSystemTemplate } from './react_system';
 
 // 导出所有初始化函数
 export {
@@ -33,4 +35,6 @@ export {
   initGoalGenerationTemplate,
   initPlanningSystemTemplate,
   initPlanningThinkingTemplate,
+  initReActThinkingTemplate,
+  initReActSystemTemplate,
 };

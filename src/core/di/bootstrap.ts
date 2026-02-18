@@ -274,14 +274,6 @@ export function configureServices(container: Container): void {
       await memory.saveAll();
     });
 
-  // ModeManager (单例)
-  container.registerSingleton(ServiceKeys.ModeManager, c => {
-    const { ModeManager } = require('@/core/agent/mode/ModeManager');
-    const executor = c.resolve(ServiceKeys.ActionExecutor) as any;
-    const context = executor.getContextManager().getContext();
-    return new ModeManager(context);
-  });
-
   // InterruptController (单例)
   container.registerSingleton(ServiceKeys.InterruptController, c => {
     const { InterruptController } = require('@/core/agent/InterruptController');
@@ -379,10 +371,9 @@ export function configureServices(container: Container): void {
       const config = c.resolve<AppConfig>(ServiceKeys.Config);
       const logger = c.resolve<Logger>(ServiceKeys.Logger);
       const memory = await c.resolveAsync(ServiceKeys.MemoryManager);
-      const modeManager = c.resolve(ServiceKeys.ModeManager);
       const interrupt = c.resolve(ServiceKeys.InterruptController);
 
-      return new Agent(bot, executor, llmManager, config, memory, modeManager, interrupt, logger);
+      return new Agent(bot, executor, llmManager, config, memory, interrupt, logger);
     })
     .withInitializer(ServiceKeys.Agent, async (agent: any) => {
       await agent.initialize();

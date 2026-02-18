@@ -3,7 +3,6 @@
  */
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
-import type { ModeManager } from './mode/ModeManager';
 import type { MemoryManager } from './memory/MemoryManager';
 import type { InterruptController } from './InterruptController';
 import type { AppConfig as Config } from '@/utils/Config';
@@ -21,9 +20,9 @@ export interface AgentState {
   readonly context: RuntimeContext;
 
   // 子系统
-  readonly modeManager: ModeManager;
   readonly memory: MemoryManager;
   readonly llmManager: any; // LLMManager 类型
+  readonly reactAgent?: any; // ReactAgent 类型 (避免循环导入)
 
   // 中断控制
   readonly interrupt: InterruptController;
@@ -42,6 +41,7 @@ export interface AgentStatus {
   currentTask: any; // Task 类型
   interrupted: boolean;
   interruptReason: string;
+  useReActMode?: boolean;
 }
 
 /**

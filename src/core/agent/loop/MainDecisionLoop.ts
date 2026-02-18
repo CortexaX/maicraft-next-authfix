@@ -13,7 +13,7 @@ import type { AgentState } from '@/core/agent/types';
 import { LLMManager } from '@/llm/LLMManager';
 import { BaseLoop } from './BaseLoop';
 import { promptManager, initAllTemplates } from '@/core/agent/prompt';
-import { ModeManager } from '@/core/agent/mode/ModeManager';
+import { ReActAgent } from '@/core/agent/react';
 import { StructuredOutputManager } from '@/core/agent/structured';
 import { PromptDataCollector } from '@/core/agent/prompt/PromptDataCollector';
 import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
@@ -84,27 +84,14 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
     // 3. 通知游戏状态更新
     await this.notifyGameStateUpdate();
 
-    // 4. 检查是否需要进入规划模式
-    const needsPlanning = this.checkNeedsPlanning();
-    if (needsPlanning && this.state.modeManager.getCurrentMode() !== 'planning_mode') {
-      this.logger.info('🎯 检测到需要规划，切换到规划模式');
-      await this.state.modeManager.setMode(ModeManager.MODE_TYPES.PLANNING, '有目标但无任务，需要规划');
-      // 模式切换后，跳过本次决策，让规划模式在下次循环中执行
-      await this.sleep(500);
-      return;
-    }
+    // 4. 检查规划需求（ReActAgent 内部处理）
+    // ReActAgent.planningChecker 会自动检测规划需求
 
-    // 5. 检查模式自动切换
-    const modeSwitched = await this.state.modeManager.checkAutoTransitions();
-    if (modeSwitched) {
-      this.logger.debug('✨ 模式已自动切换');
-      // 模式切换后，跳过本次决策，让新模式在下次循环中执行
-      await this.sleep(500);
-      return;
-    }
+    // 5. 检查紧急情况（ReActAgent 内部处理）
+    // ReActAgent.urgentChecker 会自动检测紧急情况
 
-    // 6. 执行当前模式逻辑
-    await this.executeCurrentMode();
+    // 6. 执行 ReAct 迭代
+    await this.executeReActIteration();
 
     // 7. 定期总结经验（每10次循环）
     // 注意：删除了任务评估，改为自动检测
@@ -116,45 +103,11 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
 
   /**
    * 通知游戏状态更新
-   * 替代原maicraft的环境监听器机制
+   * ReAct 模式不需要通知模式管理器
    */
   private async notifyGameStateUpdate(): Promise<void> {
-    try {
-      const gameState = this.state.context.gameState;
-      await this.state.modeManager.notifyGameStateUpdate(gameState);
-    } catch (error) {
-      this.logger.error('❌ 游戏状态通知失败:', undefined, error as Error);
-    }
-  }
-
-  /**
-   * 检查是否需要进入规划模式
-   * 触发条件：有活动目标但没有任务时
-   */
-  private checkNeedsPlanning(): boolean {
-    const goalManager = this.state.context.goalManager;
-    const taskManager = this.state.context.taskManager;
-
-    if (!goalManager || !taskManager) {
-      return false;
-    }
-
-    // 获取当前目标
-    const currentGoal = goalManager.getCurrentGoal();
-    if (!currentGoal) {
-      return false; // 没有目标，不需要规划
-    }
-
-    // 获取当前目标的活动任务
-    const activeTasks = taskManager.getActiveTasks(currentGoal.id);
-
-    // 如果有目标但没有任务，需要规划
-    if (activeTasks.length === 0) {
-      this.logger.debug(`🎯 检测到目标 [${currentGoal.id}] 没有任务，需要规划`);
-      return true;
-    }
-
-    return false;
+    // ReAct 模式直接在每次迭代中收集观察
+    // 不需要通知模式管理器
   }
 
   /**
@@ -165,43 +118,33 @@ export class MainDecisionLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 执行当前模式逻辑
-   * 参考原maicraft：直接调用当前模式的执行方法
+   * 执行 ReAct 迭代
    */
-  private async executeCurrentMode(): Promise<void> {
-    try {
-      await this.state.modeManager.executeCurrentMode();
-    } catch (error) {
-      this.logger.error('❌ 模式执行失败:', undefined, error as Error);
+  private async executeReActIteration(): Promise<void> {
+    const reactAgent = this.state.reactAgent;
+    if (!reactAgent) {
+      this.logger.error('❌ ReActAgent 未初始化');
+      return;
+    }
 
-      // 安全机制：严重错误时强制恢复到主模式
-      if (this.state.modeManager.getCurrentMode() !== ModeManager.MODE_TYPES.MAIN) {
-        this.logger.warn('🔄 检测到模式执行异常，尝试恢复到主模式');
-        await this.state.modeManager.forceRecoverToMain('模式执行异常恢复');
+    try {
+      const result = await reactAgent.runIteration();
+      if (result) {
+        this.logger.debug(`✅ ReAct 迭代完成: ${result.success ? '成功' : '失败'}`);
+      } else {
+        this.logger.debug('⏭️ ReAct 迭代跳过（可能需要规划）');
       }
+    } catch (error) {
+      this.logger.error('❌ ReAct 迭代执行失败:', undefined, error as Error);
     }
   }
 
   /**
-   * 根据当前模式调整等待时间
+   * 调整等待时间
    */
   private async adjustSleepDelay(): Promise<void> {
-    const currentMode = this.state.modeManager.getCurrentMode();
-
-    switch (currentMode) {
-      case ModeManager.MODE_TYPES.COMBAT:
-        // 战斗模式需要快速响应
-        await this.sleep(200);
-        break;
-      case ModeManager.MODE_TYPES.MAIN:
-        // 主模式正常间隔
-        await this.sleep(100);
-        break;
-      default:
-        // 其他模式默认间隔
-        await this.sleep(500);
-        break;
-    }
+    // ReAct 模式使用固定间隔
+    await this.sleep(200);
   }
 
   /**

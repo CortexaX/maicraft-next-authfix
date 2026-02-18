@@ -16,6 +16,8 @@ export { initPlanGenerationTemplate } from './plan_generation';
 export { initGoalGenerationTemplate } from './goal_generation';
 export { initPlanningSystemTemplate } from './planning_system';
 export { initPlanningThinkingTemplate } from './planning_thinking';
+export { initReActThinkingTemplate } from './react_thinking';
+export { initReActSystemTemplate } from './react_system';
 
 // 导入所有模板初始化函数（一次性）
 import {
@@ -32,6 +34,8 @@ import {
   initGoalGenerationTemplate,
   initPlanningSystemTemplate,
   initPlanningThinkingTemplate,
+  initReActThinkingTemplate,
+  initReActSystemTemplate,
 } from './template_initializers';
 
 /**
@@ -64,6 +68,10 @@ export function initAllCoreTemplates(): void {
     // 操作模板
     initFurnaceOperationTemplate();
     initChestOperationTemplate();
+
+    // ReAct 模板
+    initReActThinkingTemplate();
+    initReActSystemTemplate();
   } catch (error) {
     console.error('模板初始化失败:', error);
     throw error;

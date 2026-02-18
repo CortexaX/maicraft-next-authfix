@@ -10,12 +10,12 @@ import type { AppConfig as Config } from '@/utils/Config';
 import type { AgentState, AgentStatus, GameContext } from './types';
 import { InterruptController } from './InterruptController';
 import { MemoryManager } from './memory/MemoryManager';
-import { ModeManager } from './mode/ModeManager';
 import { MainDecisionLoop } from './loop/MainDecisionLoop';
 import { ChatLoop } from './loop/ChatLoop';
 import { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { PromptDataCollector } from './prompt/PromptDataCollector';
 import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
+import { ReActAgent } from './react';
 
 export class Agent {
   // 共享状态（只读）
@@ -37,6 +37,10 @@ export class Agent {
   // 生命周期
   private isRunning: boolean = false;
 
+  // ReAct 架构配置
+  private reactAgent: ReActAgent | null = null;
+  private useReActMode: boolean = true; // TODO: read from config
+
   private logger: Logger;
 
   constructor(
@@ -45,7 +49,6 @@ export class Agent {
     llmManager: any,
     config: Config,
     memory: MemoryManager,
-    modeManager: ModeManager,
     interrupt: InterruptController,
     logger?: Logger,
   ) {
@@ -62,19 +65,20 @@ export class Agent {
       goal: config.agent?.goal || '探索世界',
       isRunning: false,
       context,
-      modeManager,
       memory,
       llmManager: this.llmManager,
       interrupt,
       config,
     };
 
-    // 绑定状态到 ModeManager
-    this.state.modeManager.bindState(this.state);
-
     // 创建决策循环（依赖 AgentState，在这里创建）
     this.mainLoop = new MainDecisionLoop(this.state, this.llmManager);
     this.chatLoop = new ChatLoop(this.state, this.llmManager);
+
+    // Initialize ReActAgent if using ReAct mode
+    if (this.useReActMode) {
+      this.reactAgent = new ReActAgent(this.state);
+    }
 
     // 初始化数据收集器
     const actionPromptGenerator = new ActionPromptGenerator(this.executor);
@@ -141,8 +145,12 @@ export class Agent {
         }
       }
 
-      // 注册所有模式
-      await this.state.modeManager.registerModes();
+      // Log architecture mode
+      if (this.useReActMode) {
+        this.logger.info('🚀 使用 ReAct 架构');
+      } else {
+        this.logger.info('📦 使用传统模式系统');
+      }
 
       this.logger.info('✅ Agent 初始化完成');
     } catch (error) {
@@ -166,10 +174,11 @@ export class Agent {
     this.logger.info('🚀 Agent 启动中...');
 
     try {
-      // 设置初始模式
-      await this.state.modeManager.setMode(ModeManager.MODE_TYPES.MAIN, '初始化');
-
-      // 启动决策循环
+      if (this.useReActMode && this.reactAgent) {
+        // ReAct mode - the MainDecisionLoop will use ReActAgent
+        this.logger.info('🔄 ReAct 模式已激活');
+      }
+      // Start decision loops
       this.mainLoop.start();
       this.chatLoop.start();
 
@@ -305,14 +314,13 @@ export class Agent {
    * 设置事件监听（游戏逻辑相关）
    */
   private setupEventListeners(): void {
-    const { context, interrupt, modeManager } = this.state;
+    const { context, interrupt } = this.state;
 
-    // 受伤事件 - 切换到战斗模式
+    // 受伤事件 - 记录到记忆系统（战斗模式切换由 UrgentChecker 处理）
     context.events.on('entityHurt', async (data: any) => {
       if (data.entity?.id === context.bot.entity?.id) {
-        // 只有当受伤的是自己时才切换模式
-        await modeManager.trySetMode(ModeManager.MODE_TYPES.COMBAT, '受到攻击');
-        this.state.memory.recordThought('⚔️ 受到攻击，切换到战斗模式', { entity: data.entity });
+        // 只有当受伤的是自己时才记录
+        this.state.memory.recordThought('⚔️ 受到攻击', { entity: data.entity });
       }
     });
 
@@ -379,11 +387,12 @@ export class Agent {
 
     return {
       isRunning: this.isRunning,
-      currentMode: this.state.modeManager.getCurrentMode(),
+      currentMode: 'react',
       goal: currentGoal?.content || this.state.goal,
       currentTask: null, // 新系统中不再有单一的currentTask概念
       interrupted: this.state.interrupt.isInterrupted(),
       interruptReason: this.state.interrupt.getReason(),
+      useReActMode: this.useReActMode,
     };
   }
 
