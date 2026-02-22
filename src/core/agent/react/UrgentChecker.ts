@@ -36,18 +36,16 @@ export class UrgentChecker {
 
   /**
    * 注册事件监听器
-   * 使用 EventManager 监听实体更新事件
+   *
+   * 注意：敌对生物检测完全依赖 check() 方法中的轮询机制
+   * 不使用事件驱动，因为：
+   * 1. mineflayer 没有原生的 entityUpdated 事件
+   * 2. entityHurt 事件数据与 nearbyEntities 无直接关联
+   * 3. 轮询机制已经足够处理敌对生物检测
    */
   private registerEventListeners(): void {
-    const { events, gameState } = this.state.context;
-
-    // 通过 EventManager 监听实体更新事件
-    if (events) {
-      events.on('entityUpdated' as any, (data: any) => {
-        // 当有新实体更新时，检查是否为敌对生物
-        this.checkForHostileEntities(gameState.nearbyEntities || []);
-      });
-    }
+    // 敌对生物检测依赖 check() 方法中的轮询机制
+    // 不使用事件驱动
   }
 
   /**

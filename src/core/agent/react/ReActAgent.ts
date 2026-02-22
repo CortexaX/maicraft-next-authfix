@@ -54,15 +54,62 @@ export class ReActAgent {
 
     // 1. 检查是否需要规划
     if (this.planningChecker.check()) {
-      logger.info('检测到需要规划，暂停当前迭代');
-      return null;
+      logger.info('检测到需要规划，自动触发规划动作');
+
+      // 获取当前目标以获取 content 参数
+      const goalManager = this.state.context.goalManager;
+      const currentGoal = goalManager?.getCurrentGoal();
+
+      if (!currentGoal) {
+        logger.warn('规划检测返回 true 但没有当前目标，跳过');
+        return null;
+      }
+
+      // 构造 plan_action 动作（必须包含 content 参数）
+      const planAction: StructuredAction = {
+        action_type: 'plan_action',
+        type: 'goal',
+        operation: 'add',
+        content: currentGoal.content,  // 必需参数！从当前目标获取
+        intention: '自动规划：检测到当前目标没有任务',
+      } as StructuredAction;
+
+      // 执行规划动作
+      const result = await this.executeAction(planAction, 'planned');
+
+      // 记录到 ReAct 历史（不记录到记忆系统，PlanningChecker 已记录）
+      this.reactHistory.add({
+        thought: `自动触发规划，为目标 [${currentGoal.id}] 添加任务`,
+        action: planAction,
+        observation: result.observation,
+      });
+
+      return result;
     }
 
     // 2. 检查紧急情况
     const urgentAction = await this.urgentChecker.check();
     if (urgentAction) {
       logger.info('处理紧急情况');
-      return this.executeAction(urgentAction, 'urgent');
+
+      // 执行紧急动作
+      const result = await this.executeAction(urgentAction, 'urgent');
+
+      // 记录到 ReAct 历史和记忆（紧急动作也需要记录）
+      const thought = urgentAction.intention || `紧急处理: ${urgentAction.action_type}`;
+      this.recordToMemory(thought, urgentAction, result);
+      this.reactHistory.add({
+        thought,
+        action: urgentAction,
+        observation: result.observation,
+      });
+
+      logger.info('紧急动作已记录', {
+        action: urgentAction.action_type,
+        success: result.success,
+      });
+
+      return result;
     }
 
     // 3. 收集观察
