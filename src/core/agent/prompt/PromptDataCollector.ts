@@ -18,6 +18,9 @@ export interface BaseInfoData {
   player_name: string;
   self_info: string;
   goal: string;
+  current_goal: string;
+  task_list: string;
+  goal_completed_hint: string;
   to_do_list: string;
   self_status_info: string;
   inventory_info: string;
@@ -136,7 +139,7 @@ export class PromptDataCollector {
       entity_search_distance: gameState.entitySearchDistance || 16, // 实体搜索距离
       nearby_entities_info: gameState.getNearbyEntitiesDescription?.() || '无',
       chat_str: this.getChatHistory(),
-      mode: this.state.modeManager.getCurrentMode(),
+      mode: 'react',
       task: '', // 新系统中不再有单一currentTask
     };
   }
@@ -148,6 +151,7 @@ export class PromptDataCollector {
     const { gameState } = this.state.context;
 
     return {
+      available_actions: '', // 将在 collectAllData() 中设置
       eat_action: this.shouldShowEatAction(gameState) ? this.generateEatActionPrompt() : '',
       kill_mob_action: this.shouldShowKillMobAction(gameState) ? this.generateKillMobActionPrompt() : '',
     };
