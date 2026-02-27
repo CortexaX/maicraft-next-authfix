@@ -11,20 +11,24 @@
 ### 1.1 当前系统的问题
 
 **架构问题**：
+
 - Goal-Plan-Task 三层架构过度设计，Plan 层职责不明确
 - 代码量大（~3000 行），维护成本高
 
 **决策模式问题**：
+
 - 采用 Plan-and-Execute 模式，而非 ReAct
 - 需要 LLM 预先生成完整计划，成功率低
 - 偏离 Python 版本的成功模式
 
 **Tracker 系统问题**：
+
 - 只有 4 种基础 Tracker，无法表达复杂任务
 - 进度追踪粒度粗，只能判断完成/未完成
 - 不满足 MECE 原则（有遗漏、有重叠）
 
 **反馈循环问题**：
+
 - 任务与动作系统脱节，LLM 不知道如何执行
 - 定期评估（每 5 次循环）太慢，bot 重复无效动作
 
@@ -46,11 +50,13 @@
 **选择**：**ReAct 模式**
 
 **理由**：
+
 - Python 版本已证明 ReAct 有效
 - 当前 LLM 能力更适合短期决策
 - 反馈循环短，试错成本低
 
 **影响**：
+
 - 去除计划生成系统
 - LLM 每次循环直接决策动作
 - 任务清单作为"提示"而非"指令"
@@ -62,10 +68,12 @@
 **选择**：**两层（去除 Plan 层）**
 
 **理由**：
+
 - Plan 层只是 Task 容器，没有独立职责
 - 两层更符合 LLM 理解
 
 **设计**：
+
 ```
 Goal（目标）
 - 特征：抽象、可能需要多步骤
@@ -80,6 +88,7 @@ Task（任务）
 ```
 
 **区分标准**（提供给 LLM）：
+
 1. 能用一个动作完成？→ Task，否则 → Goal
 2. 有明确完成标准？→ Task，否则 → Goal
 3. 查看动作列表，能直接对应？→ Task，否则 → Goal
@@ -91,10 +100,12 @@ Task（任务）
 **选择**：**plan_action（统一工具）**
 
 **理由**：
+
 - 目标和任务结构相似，参数基本一致
 - 统一接口减少 LLM 学习成本
 
 **参数设计**：
+
 ```typescript
 {
   type: 'goal' | 'task',           // 区分目标/任务
@@ -114,10 +125,12 @@ Task（任务）
 **选择**：**自动检测与手动标记并存**
 
 **理由**：
+
 - 有些任务无法用 Tracker（如"建造漂亮的房子"）
 - 有些任务能精确追踪（如"收集 20 个木材"）
 
 **工作机制**：
+
 ```
 自动模式（后台每次循环）：
 - 有 Tracker 的目标/任务自动检测
@@ -136,11 +149,13 @@ Task（任务）
 **选择**：**使用语义化 ID 而非 UUID**
 
 **理由**：
+
 - LLM 更容易理解和引用
 - 方便调试和日志查看
 - 表达归属关系
 
 **生成规则**：
+
 ```
 Goal: 关键词下划线连接
   "找到村庄" → "find_village"
@@ -161,11 +176,13 @@ Task: goalId + "_" + 关键词
 **选择**：**不强制对应，任务作为提示**
 
 **理由**：
+
 - 无法强制一一对应（会限制创造力）
 - 任务可以是"持续提醒"
 - LLM 用动作组合完成任务
 
 **辅助策略**：
+
 - Prompt 中提供动作列表（简洁版）
 - 强调"能用一个动作完成的才是任务"
 
@@ -275,14 +292,14 @@ src/core/actions/implementations/
 
 ```typescript
 interface Goal {
-  id: string;              // 语义化ID
-  content: string;         // 描述
-  tracker?: Tracker;       // 可选的自动检测
+  id: string; // 语义化ID
+  content: string; // 描述
+  tracker?: Tracker; // 可选的自动检测
   status: 'active' | 'completed' | 'abandoned';
-  priority: number;        // 1-5
+  priority: number; // 1-5
   createdAt: number;
   completedAt?: number;
-  completedBy?: 'tracker' | 'llm';  // 记录完成方式
+  completedBy?: 'tracker' | 'llm'; // 记录完成方式
   metadata: Record<string, any>;
 }
 ```
@@ -291,12 +308,12 @@ interface Goal {
 
 ```typescript
 interface Task {
-  id: string;              // 语义化ID
-  content: string;         // 描述
-  goalId: string;          // 所属目标（必需）
-  tracker?: Tracker;       // 可选的自动检测
+  id: string; // 语义化ID
+  content: string; // 描述
+  goalId: string; // 所属目标（必需）
+  tracker?: Tracker; // 可选的自动检测
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
-  priority: number;        // 1-5
+  priority: number; // 1-5
   createdAt: number;
   updatedAt: number;
   completedAt?: number;
@@ -331,6 +348,7 @@ Tracker (基类)
 ```
 
 **MECE 分析**：
+
 - **Mutually Exclusive**（互斥）：状态型 vs 动作型，清晰区分
 - **Collectively Exhaustive**（完备）：
   - 状态型：背包、位置、实体、环境（覆盖游戏世界的主要状态）
@@ -342,26 +360,26 @@ Tracker (基类)
 ```typescript
 // 进度信息
 interface TrackerProgress {
-  current: number;         // 当前进度值
-  target: number;          // 目标值
-  percentage: number;      // 百分比 0-100
-  description: string;     // 如 "15/20 oak_log"
-  details?: any;           // 额外细节
+  current: number; // 当前进度值
+  target: number; // 目标值
+  percentage: number; // 百分比 0-100
+  description: string; // 如 "15/20 oak_log"
+  details?: any; // 额外细节
 }
 
 // Tracker 基类
 interface Tracker {
   type: string;
-  
+
   // 检查是否完成
   checkCompletion(context: GameContext): boolean;
-  
+
   // 获取进度（关键：提供详细进度）
   getProgress(context: GameContext): TrackerProgress;
-  
+
   // 获取描述
   getDescription(): string;
-  
+
   // 序列化
   toJSON(): any;
 }
@@ -370,6 +388,7 @@ interface Tracker {
 #### 新增 Tracker 类型
 
 **EntityTracker** - 实体追踪（解决"找到村民"等任务）：
+
 ```typescript
 interface EntityTrackerConfig {
   entityType?: string;     // 如 'villager'
@@ -385,6 +404,7 @@ interface EntityTrackerConfig {
 ```
 
 **EnvironmentTracker** - 环境追踪（解决"等待白天"等任务）：
+
 ```typescript
 interface EnvironmentTrackerConfig {
   timeOfDay?: {min?: number, max?: number};  // 0-24000
@@ -430,31 +450,31 @@ interface CompositeTrackerConfig {
 ```typescript
 class GoalManager {
   // 核心方法
-  addGoal(params): Goal;              // 添加目标
-  updateGoal(id, updates): void;      // 更新目标
-  removeGoal(id): void;               // 删除目标
-  completeGoal(id, completedBy): void;// 完成目标
-  
+  addGoal(params): Goal; // 添加目标
+  updateGoal(id, updates): void; // 更新目标
+  removeGoal(id): void; // 删除目标
+  completeGoal(id, completedBy): void; // 完成目标
+
   // 自动检测（后台调用）
-  checkCompletion(context): void;     // 检测所有活动目标
-  
+  checkCompletion(context): void; // 检测所有活动目标
+
   // 查询
-  getCurrentGoal(): Goal | null;      // 获取当前目标
-  getActiveGoals(): Goal[];           // 获取所有活动目标
-  
+  getCurrentGoal(): Goal | null; // 获取当前目标
+  getActiveGoals(): Goal[]; // 获取所有活动目标
+
   // 格式化（用于 Prompt）
-  formatGoals(context?): string;      // 格式化显示
+  formatGoals(context?): string; // 格式化显示
   // 输出示例：
   // 🎯 [find_village] 找到村庄
   // 📌 [get_diamond] 挖到钻石 (0/1 钻石)
-  
+
   // 持久化
   toJSON(): any;
   static fromJSON(json): GoalManager;
-  
+
   // 私有方法
-  private generateId(content): string;        // 生成语义化ID
-  private ensureUniqueId(baseId): string;     // 确保ID唯一
+  private generateId(content): string; // 生成语义化ID
+  private ensureUniqueId(baseId): string; // 确保ID唯一
 }
 ```
 
@@ -463,24 +483,24 @@ class GoalManager {
 ```typescript
 class TaskManager {
   // 核心方法
-  addTask(params): Task;              // 添加任务
-  updateTask(id, updates): void;      // 更新任务
-  removeTask(id): void;               // 删除任务
-  completeTask(id, completedBy): void;// 完成任务
-  
+  addTask(params): Task; // 添加任务
+  updateTask(id, updates): void; // 更新任务
+  removeTask(id): void; // 删除任务
+  completeTask(id, completedBy): void; // 完成任务
+
   // 自动检测
-  checkCompletion(context): void;     // 检测所有未完成任务
-  
+  checkCompletion(context): void; // 检测所有未完成任务
+
   // 查询
-  getTasksByGoal(goalId): Task[];     // 获取目标的任务
-  
+  getTasksByGoal(goalId): Task[]; // 获取目标的任务
+
   // 格式化（用于 Prompt）
   formatTasks(goalId?, context?): string;
   // 输出示例：
   // ✅ [task_1] 收集20个木材 (20/20)
   // 🔄 [task_2] 制作工作台
   // ⏳ [task_3] 收集圆石 (5/20)
-  
+
   // 持久化
   toJSON(): any;
   static fromJSON(json): TaskManager;
@@ -496,7 +516,7 @@ class PlanAction extends BaseAction<PlanActionParams> {
   readonly id = ActionIds.PLAN_ACTION;
   readonly name = 'PlanAction';
   readonly description = '管理目标和任务的规划';
-  
+
   // 执行方法
   async execute(context, params): Promise<ActionResult> {
     // 根据 type 分发
@@ -506,23 +526,26 @@ class PlanAction extends BaseAction<PlanActionParams> {
       return this.handleTask(context, params);
     }
   }
-  
+
   // 参数 Schema（提供给 LLM）
   getParamsSchema(): any {
     return {
-      type: {enum: ['goal', 'task'], required: true},
-      operation: {enum: ['add', 'edit', 'remove', 'complete'], required: true},
-      id: {type: 'string', pattern: '^[a-z][a-z0-9_]*$'},
-      content: {type: 'string'},
-      goalId: {type: 'string'},  // 仅 task 的 add 需要
-      tracker: {type: 'object', properties: {
-        type: {enum: ['inventory', 'location', 'entity', 'environment', 'craft', 'composite']},
-        // ... 各 Tracker 的具体参数
-      }},
-      priority: {type: 'number', min: 1, max: 5}
+      type: { enum: ['goal', 'task'], required: true },
+      operation: { enum: ['add', 'edit', 'remove', 'complete'], required: true },
+      id: { type: 'string', pattern: '^[a-z][a-z0-9_]*$' },
+      content: { type: 'string' },
+      goalId: { type: 'string' }, // 仅 task 的 add 需要
+      tracker: {
+        type: 'object',
+        properties: {
+          type: { enum: ['inventory', 'location', 'entity', 'environment', 'craft', 'composite'] },
+          // ... 各 Tracker 的具体参数
+        },
+      },
+      priority: { type: 'number', min: 1, max: 5 },
     };
   }
-  
+
   // 私有方法
   private handleGoal(context, params): Promise<ActionResult>;
   private handleTask(context, params): Promise<ActionResult>;
@@ -632,16 +655,19 @@ class PlanAction extends BaseAction<PlanActionParams> {
 ### 6.1 删除旧系统
 
 **删除文件**：
+
 - `src/core/agent/planning/Plan.ts`
 - `src/core/agent/planning/Task.ts`（旧版）
 - `src/core/agent/planning/TaskHistory.ts`
 - `src/core/agent/planning/GoalPlanningManager.ts`
 
 **删除 Prompt**：
+
 - `data/prompts/plan-generation-system.txt`
 - `data/prompts/task-evaluation-system.txt`
 
 **删除功能**：
+
 - `generatePlanForCurrentGoal()` 方法
 - `handleTaskEvaluation()` 方法
 - 定期任务评估逻辑
@@ -651,6 +677,7 @@ class PlanAction extends BaseAction<PlanActionParams> {
 ### 6.2 创建新系统
 
 **新建文件**（按顺序）：
+
 1. `src/core/agent/planning/goal/Goal.ts` - 数据结构
 2. `src/core/agent/planning/goal/GoalManager.ts` - 管理器
 3. `src/core/agent/planning/task/Task.ts` - 数据结构
@@ -660,6 +687,7 @@ class PlanAction extends BaseAction<PlanActionParams> {
 7. `src/core/actions/implementations/PlanAction.ts` - 规划动作
 
 **实施注意事项**：
+
 - Tracker 保留现有实现作为基础，增强而非重写
 - TrackerFactory 需要更新以支持新 Tracker
 - 每个 Tracker 都要实现 `getProgress()` 方法
@@ -675,40 +703,37 @@ class MainDecisionLoop {
   // 添加字段
   private goalManager: GoalManager;
   private taskManager: TaskManager;
-  
+
   async runIteration() {
     // 1. 自动检测（每次循环）
     this.goalManager.checkCompletion(this.context);
     this.taskManager.checkCompletion(this.context);
-    
+
     // 2. 收集状态
     const state = await this.collectState();
-    
+
     // 3. 构建 Prompt
     const prompt = this.buildPromptWithPlanning(state);
-    
+
     // 4-6. LLM 决策、执行、记录（保持不变）
     // ...
   }
-  
+
   private buildPromptWithPlanning(state): string {
     const currentGoal = this.goalManager.getCurrentGoal();
-    
+
     return promptManager.generatePrompt('main_thinking', {
       ...state,
       current_goal: this.goalManager.formatGoals(this.context),
-      task_list: currentGoal 
-        ? this.taskManager.formatTasks(currentGoal.id, this.context)
-        : '没有当前目标',
-      goal_completed_hint: !currentGoal 
-        ? '\n💡 提示：当前目标已完成，你可以设定新的目标继续冒险'
-        : ''
+      task_list: currentGoal ? this.taskManager.formatTasks(currentGoal.id, this.context) : '没有当前目标',
+      goal_completed_hint: !currentGoal ? '\n💡 提示：当前目标已完成，你可以设定新的目标继续冒险' : '',
     });
   }
 }
 ```
 
 **删除**：
+
 - `checkAndGeneratePlan()` 方法
 - `evaluateTask()` 方法
 - 定期评估的计数器
@@ -718,6 +743,7 @@ class MainDecisionLoop {
 ### 6.4 更新 Prompt
 
 **main-thinking-system.txt**：
+
 - 添加"规划原则"章节
 - 添加"目标 vs 任务"区分标准
 - 添加简洁的动作列表
@@ -725,6 +751,7 @@ class MainDecisionLoop {
 - 删除计划生成相关内容
 
 **main-thinking.txt**：
+
 - 修改变量名：`to_do_list` → `task_list`
 - 添加 `goal_completed_hint` 变量
 - 强调使用 `plan_action` 管理任务
@@ -734,10 +761,12 @@ class MainDecisionLoop {
 ### 6.5 数据持久化
 
 **数据文件**：
+
 - `data/goals.json` - 目标数据
 - `data/tasks.json` - 任务数据
 
 **迁移脚本**（可选）：
+
 ```typescript
 // scripts/migrate-planning-data.ts
 // 将 goal-planning.json 转换为新格式
@@ -749,18 +778,18 @@ class MainDecisionLoop {
 
 ### 6.6 实施时间估算
 
-| 任务 | 时间 | 说明 |
-|------|------|------|
-| 1. 删除旧系统 | 0.5天 | 删除文件和代码 |
-| 2. 创建新数据结构 | 1天 | Goal/Task 结构和类型 |
-| 3. 实现 GoalManager | 1.5天 | 核心管理逻辑 |
-| 4. 实现 TaskManager | 1.5天 | 核心管理逻辑 |
-| 5. 重新设计 Tracker | 3天 | 5个Tracker + Factory |
-| 6. 实现 PlanAction | 1天 | Action实现和注册 |
-| 7. 改造主循环 | 1.5天 | 集成新系统 |
-| 8. 更新 Prompt | 1天 | 两个Prompt文件 |
-| 9. 测试和调试 | 2天 | 单元测试和集成测试 |
-| **总计** | **13天** | |
+| 任务                | 时间     | 说明                 |
+| ------------------- | -------- | -------------------- |
+| 1. 删除旧系统       | 0.5天    | 删除文件和代码       |
+| 2. 创建新数据结构   | 1天      | Goal/Task 结构和类型 |
+| 3. 实现 GoalManager | 1.5天    | 核心管理逻辑         |
+| 4. 实现 TaskManager | 1.5天    | 核心管理逻辑         |
+| 5. 重新设计 Tracker | 3天      | 5个Tracker + Factory |
+| 6. 实现 PlanAction  | 1天      | Action实现和注册     |
+| 7. 改造主循环       | 1.5天    | 集成新系统           |
+| 8. 更新 Prompt      | 1天      | 两个Prompt文件       |
+| 9. 测试和调试       | 2天      | 单元测试和集成测试   |
+| **总计**            | **13天** |                      |
 
 ---
 
@@ -826,14 +855,17 @@ class MainDecisionLoop {
 ### 8.1 设计哲学
 
 **从"预先规划"到"即时反应"**：
+
 - 旧：LLM 生成完整计划 → 按计划执行 → 定期评估
 - 新：LLM 观察状态 → 决策下一步 → 立即反馈
 
 **从"强制对应"到"灵活引导"**：
+
 - 旧：任务必须对应某个 Tracker
 - 新：Tracker 辅助，LLM 自主判断
 
 **从"复杂嵌套"到"扁平清晰"**：
+
 - 旧：Goal → Plan → Task
 - 新：Goal → Task
 
@@ -848,16 +880,19 @@ class MainDecisionLoop {
 ### 8.3 注意事项
 
 **开发时**：
+
 - Tracker 要考虑边界情况（如实体消失、环境变化）
 - Manager 要处理 ID 冲突
 - PlanAction 要验证参数完整性
 
 **测试时**：
+
 - 测试各种 Tracker 组合
 - 测试自动检测的时机
 - 测试 LLM 理解语义化 ID
 
 **部署时**：
+
 - 备份现有数据
 - 提供数据迁移工具
 - 保留旧系统一段时间作为对比

@@ -7,6 +7,7 @@
 ### 聊天场景覆盖模板（虚拟主播）
 
 对应MaiBot中实际存在的提示词模板：
+
 - `chatTargetGroup1.ts` - 直播场景描述（详细）
 - `chatTargetGroup2.ts` - 直播场景描述（简短）
 - `chatTargetPrivate1.ts` - 私信场景描述（详细）
@@ -21,16 +22,18 @@
 ## 如何添加新的提示词模板
 
 1. **创建新的模板文件**：
+
    ```typescript
    // src/core/agent/communication/templates/yourTemplateName.ts
    export const yourTemplateName = {
-     name: 'your_template_name',  // 下划线命名，用于API
+     name: 'your_template_name', // 下划线命名，用于API
      content: '你的提示词内容...',
-     description: '模板的描述信息'
+     description: '模板的描述信息',
    } as const;
    ```
 
 2. **在 `overrideTemplates.ts` 中导入并注册**：
+
    ```typescript
    import { yourTemplateName } from './yourTemplateName';
 

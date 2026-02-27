@@ -14,6 +14,7 @@
 在 Agent 主循环中调用箱子/熔炉 GUI 模式时，`bot.openContainer()` 总是超时，无法触发 `windowOpen` 事件。但在 test-bot 单独测试环境中，相同的代码却能正常工作。
 
 **错误现象**：
+
 ```
 [QueryContainer] ⏰ 自定义超时（5秒），windowOpen监听器=2 个
 容器查询失败: 自定义超时：5秒内未收到 windowOpen 事件
@@ -63,6 +64,7 @@ await executeCurrentMode();    // ← 这时才执行箱子模式
 ```
 
 **问题**：
+
 1. GUI 模式切换后**立即返回主循环**
 2. 主循环继续执行其他任务（目标生成、方块扫描）
 3. 这些任务占用事件循环，导致 `bot.openContainer()` 的 `windowOpen` 事件被阻塞
@@ -80,16 +82,16 @@ await executeCurrentMode();    // ← 这时才执行箱子模式
 private async handleGUIAction(actionName: string, actionJson: any): Promise<string | null> {
     // ... 切换到 GUI 模式 ...
     await this.state.modeManager.setMode(targetMode, `LLM决策使用${actionName}`);
-    
+
     // 🔧 关键修复：立即执行 GUI 模式，并等待完成
     const guiMode = this.state.modeManager.getAllModes().find(mode => mode.type === targetMode);
     if (guiMode) {
         await guiMode.execute();  // ← 阻塞等待
     }
-    
+
     // GUI 操作完成后，切换回主模式
     await this.state.modeManager.setMode(ModeManager.MODE_TYPES.MAIN, 'GUI操作完成');
-    
+
     return targetMode;
 }
 ```
@@ -102,27 +104,27 @@ private async handleGUIAction(actionName: string, actionJson: any): Promise<stri
 
 ```typescript
 export class CacheManager {
-    private isPaused: boolean = false;
-    
-    pauseScanning(): void {
-        this.isPaused = true;
+  private isPaused: boolean = false;
+
+  pauseScanning(): void {
+    this.isPaused = true;
+  }
+
+  resumeScanning(): void {
+    this.isPaused = false;
+  }
+
+  private async onChunkLoad(chunkCorner: Vec3): Promise<void> {
+    if (!this.blockCache || this.isPaused) return; // 检查暂停标志
+    // ...
+  }
+
+  private async scanNearbyBlocks(): Promise<void> {
+    if (!this.blockCache || !this.bot.entity || this.isScanning || this.isPaused) {
+      return;
     }
-    
-    resumeScanning(): void {
-        this.isPaused = false;
-    }
-    
-    private async onChunkLoad(chunkCorner: Vec3): Promise<void> {
-        if (!this.blockCache || this.isPaused) return;  // 检查暂停标志
-        // ...
-    }
-    
-    private async scanNearbyBlocks(): Promise<void> {
-        if (!this.blockCache || !this.bot.entity || this.isScanning || this.isPaused) {
-            return;
-        }
-        // ...
-    }
+    // ...
+  }
 }
 ```
 
@@ -132,12 +134,12 @@ export class CacheManager {
 // GUI 模式执行前
 const cacheManager = (this.state.context.gameState as any).cacheManager;
 if (cacheManager) {
-    cacheManager.pauseScanning();
+  cacheManager.pauseScanning();
 }
 
 // GUI 模式执行后
 if (cacheManager) {
-    cacheManager.resumeScanning();
+  cacheManager.resumeScanning();
 }
 ```
 
@@ -153,17 +155,17 @@ private async generateNewGoalAfterCompletion(completedGoal: Goal): Promise<void>
     if (this.state.interrupt.isInterrupted()) {
         const reason = this.state.interrupt.getReason();
         this.logger.info(`⏸️ 检测到中断标志（${reason}），延迟生成新目标`);
-        
+
         // 等待中断解除后再生成
         setTimeout(() => {
             if (!this.state.interrupt.isInterrupted()) {
                 this.generateNewGoalAfterCompletion(completedGoal);
             }
         }, 2000);
-        
+
         return;
     }
-    
+
     // ... 正常生成目标 ...
 }
 ```
@@ -177,12 +179,12 @@ private async generateNewGoalAfterCompletion(completedGoal: Goal): Promise<void>
 ```typescript
 // GUI 模式执行前
 if (this.state.interrupt) {
-    this.state.interrupt.trigger(`GUI模式执行中: ${targetMode}`);
+  this.state.interrupt.trigger(`GUI模式执行中: ${targetMode}`);
 }
 
 // GUI 模式执行后
 if (this.state.interrupt) {
-    this.state.interrupt.clear();
+  this.state.interrupt.clear();
 }
 ```
 
@@ -222,6 +224,7 @@ if (this.state.interrupt) {
 ### 问题3：熔炉查询失败
 
 **错误**：
+
 ```
 [ERROR] [QueryContainerAction] 查询容器内容失败: containerToOpen is neither a block nor an entity
 ```
@@ -229,6 +232,7 @@ if (this.state.interrupt) {
 **原因**：QueryContainerAction 对所有容器统一使用 `bot.openContainer()`，但**熔炉必须用 `bot.openFurnace()`**。
 
 **修复**：
+
 ```typescript
 // 在 QueryContainerAction.ts 的 queryContainerContents 方法中
 const isFurnace = freshBlock.name === 'furnace' || freshBlock.name === 'blast_furnace' || freshBlock.name === 'smoker';
@@ -238,40 +242,43 @@ const openPromise = isFurnace ? context.bot.openFurnace(freshBlock) : context.bo
 ### 问题4：合成偶发超时
 
 **错误**：
+
 ```
 [ERROR] [CraftItemAction] 合成执行失败:
 [WARN] [CraftItemAction] 合成失败: Error: Event windowOpen did not fire within timeout of 20000ms
 ```
 
 **原因**：
+
 - `bot.craft()` 内部会打开工作台窗口
 - 合成是在主模式中直接执行的，不是 GUI 模式
 - 如果恰好有方块扫描或其他任务在运行，就会超时
 - **偶发性**：取决于扫描时机
 
 **修复**：
+
 ```typescript
 // 在 CraftManager.ts 的 performCrafting 方法中
 // 从 gameState 获取 cacheManager
 let cacheManager: any = null;
 if ((this.bot as any).cacheManager) {
-    cacheManager = (this.bot as any).cacheManager;
+  cacheManager = (this.bot as any).cacheManager;
 } else if ((this.bot as any).gameState?.cacheManager) {
-    cacheManager = (this.bot as any).gameState.cacheManager;
+  cacheManager = (this.bot as any).gameState.cacheManager;
 }
 
 // 暂停扫描
 if (cacheManager && typeof cacheManager.pauseScanning === 'function') {
-    cacheManager.pauseScanning();
+  cacheManager.pauseScanning();
 }
 
 try {
-    await this.bot.craft(recipe, count, craftingTable);
+  await this.bot.craft(recipe, count, craftingTable);
 } finally {
-    // 恢复扫描
-    if (cacheManager && typeof cacheManager.resumeScanning === 'function') {
-        cacheManager.resumeScanning();
-    }
+  // 恢复扫描
+  if (cacheManager && typeof cacheManager.resumeScanning === 'function') {
+    cacheManager.resumeScanning();
+  }
 }
 ```
 
@@ -288,8 +295,8 @@ try {
 ## 通用解决方案
 
 **核心原则**：所有需要打开容器窗口的操作，在执行期间都应该：
+
 1. 暂停方块扫描
 2. 检查并设置中断标志（如果适用）
 3. 使用正确的打开方法（`openContainer` vs `openFurnace`）
 4. 操作完成后恢复扫描
-

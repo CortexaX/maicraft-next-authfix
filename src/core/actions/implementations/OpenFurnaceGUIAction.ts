@@ -19,7 +19,7 @@ export class OpenFurnaceGUIAction extends BaseAction<any> {
     // 这个动作不执行任何实际操作
     // 它的作用是被 MainMode 检测到，然后切换到熔炉GUI模式
     // 实际的熔炉操作由熔炉模式内的其他动作完成
-    
+
     return this.success('准备进入熔炉GUI模式', {
       position: params.position,
     });
@@ -43,5 +43,3 @@ export class OpenFurnaceGUIAction extends BaseAction<any> {
     };
   }
 }
-
-

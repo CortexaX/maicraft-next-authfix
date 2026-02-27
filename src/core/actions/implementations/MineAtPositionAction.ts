@@ -278,7 +278,7 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
   private async collectBlockSilently(context: RuntimeContext, targets: any[]): Promise<void> {
     const originalChat = context.bot.chat?.bind(context.bot);
     const originalWhisper = context.bot.whisper?.bind(context.bot);
-    const filteredMessages = ["Collect finish!"];
+    const filteredMessages = ['Collect finish!'];
 
     // 临时禁用聊天消息输出
     const tempChat = (message: string) => {

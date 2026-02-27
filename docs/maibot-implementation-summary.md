@@ -136,6 +136,7 @@ Agent
 #### 4. 消息格式化
 
 ##### 思考记忆格式
+
 ```
 [思考记忆]
 {content}
@@ -143,6 +144,7 @@ Agent
 ```
 
 ##### 决策记忆格式（单条）
+
 ```
 [决策记忆] {resultIcon}
 意图: {intention}
@@ -152,6 +154,7 @@ Agent
 ```
 
 ##### 决策记忆格式（批量）
+
 ```
 [批量决策记忆]
 {icon} {intention} [{actionType}]
@@ -163,24 +166,25 @@ Agent
 
 ### 配置项详解
 
-| 配置项 | 默认值 | 说明 | 影响 |
-|--------|--------|------|------|
-| `enabled` | false | 是否启用 | 总开关 |
-| `server_url` | ws://localhost:18040/ws | MaiBot 地址 | 连接目标 |
-| `api_key` | maicraft_key | API 密钥 | 认证 |
-| `platform` | minecraft | 平台标识 | 消息维度 |
-| `reconnect` | true | 自动重连 | 可用性 |
-| `reconnect_delay` | 5000 | 重连延迟（ms） | 重连频率 |
-| `max_reconnect_attempts` | 10 | 最大重连次数 | 重试上限 |
-| `heartbeat_interval` | 30000 | 心跳间隔（ms） | 连接保活 |
-| `send_thought_memory` | true | 发送思考记忆 | 功能开关 |
-| `send_decision_memory` | true | 发送决策记忆 | 功能开关 |
-| `decision_memory_batch_size` | 5 | 批量大小 | 发送效率 |
-| `memory_send_interval` | 1000 | 发送间隔（ms） | 发送频率 |
+| 配置项                       | 默认值                  | 说明           | 影响     |
+| ---------------------------- | ----------------------- | -------------- | -------- |
+| `enabled`                    | false                   | 是否启用       | 总开关   |
+| `server_url`                 | ws://localhost:18040/ws | MaiBot 地址    | 连接目标 |
+| `api_key`                    | maicraft_key            | API 密钥       | 认证     |
+| `platform`                   | minecraft               | 平台标识       | 消息维度 |
+| `reconnect`                  | true                    | 自动重连       | 可用性   |
+| `reconnect_delay`            | 5000                    | 重连延迟（ms） | 重连频率 |
+| `max_reconnect_attempts`     | 10                      | 最大重连次数   | 重试上限 |
+| `heartbeat_interval`         | 30000                   | 心跳间隔（ms） | 连接保活 |
+| `send_thought_memory`        | true                    | 发送思考记忆   | 功能开关 |
+| `send_decision_memory`       | true                    | 发送决策记忆   | 功能开关 |
+| `decision_memory_batch_size` | 5                       | 批量大小       | 发送效率 |
+| `memory_send_interval`       | 1000                    | 发送间隔（ms） | 发送频率 |
 
 ### 典型配置场景
 
 #### 场景 1: 开发测试（高频实时）
+
 ```toml
 [maibot]
 enabled = true
@@ -191,6 +195,7 @@ send_decision_memory = true
 ```
 
 #### 场景 2: 生产环境（稳定高效）
+
 ```toml
 [maibot]
 enabled = true
@@ -201,6 +206,7 @@ send_decision_memory = true
 ```
 
 #### 场景 3: 只监控决策（节省带宽）
+
 ```toml
 [maibot]
 enabled = true
@@ -228,7 +234,7 @@ send_decision_memory = true       # 只发送决策
 recordThought(content: string, context?: Record<string, any>): void {
   const entry: ThoughtEntry = { /* ... */ };
   this.thoughts.add(entry);
-  
+
   // 检查是否来自 MaiBot，避免循环
   if (this.maibotCommunicator && context?.source !== 'maibot') {
     this.maibotCommunicator.sendThoughtMemory(entry);
@@ -242,7 +248,7 @@ recordThought(content: string, context?: Record<string, any>): void {
 // MaibotCommunicator.ts 设置回调
 communicator.setOnReplyCallback((reply: string) => {
   this.recordThought(`[MaiBot回复] ${reply}`, {
-    source: 'maibot',  // 标记来源
+    source: 'maibot', // 标记来源
     type: 'reply',
   });
 });
@@ -256,16 +262,16 @@ private async processSendQueue(): Promise<void> {
   if (now - this.lastSendTime < this.config.memory_send_interval) {
     return;
   }
-  
+
   // 分类消息
   const decisionMessages = this.messageQueue.filter(m => m.type === 'decision');
   const thoughtMessages = this.messageQueue.filter(m => m.type === 'thought');
-  
+
   // 思考消息逐条发送
   for (const message of thoughtMessages) {
     await this.sendMessage(message);
   }
-  
+
   // 决策消息批量发送
   if (decisionMessages.length > 0) {
     const batch = decisionMessages.slice(0, this.config.decision_memory_batch_size);
@@ -394,4 +400,3 @@ private async processSendQueue(): Promise<void> {
 - 实现日期: 2025-11-23
 - 版本: v0.1.0
 - 状态: ✅ 已完成
-

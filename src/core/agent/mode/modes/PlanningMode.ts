@@ -233,9 +233,7 @@ export class PlanningMode extends BaseMode {
     const allGoals = goalManager.getAllGoals();
 
     // 按时间排序，显示最近的目标
-    const sortedGoals = allGoals
-      .sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0))
-      .slice(0, 5); // 只显示最近5个目标
+    const sortedGoals = allGoals.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 5); // 只显示最近5个目标
 
     if (sortedGoals.length === 0) {
       return '无目标历史信息';
@@ -243,9 +241,7 @@ export class PlanningMode extends BaseMode {
 
     const historyLines: string[] = [];
     for (const goal of sortedGoals) {
-      const statusIcon = goal.status === 'completed' ? '✅' :
-                         goal.status === 'abandoned' ? '❌' :
-                         goal.status === 'active' ? '🎯' : '❓';
+      const statusIcon = goal.status === 'completed' ? '✅' : goal.status === 'abandoned' ? '❌' : goal.status === 'active' ? '🎯' : '❓';
 
       const timeInfo = this.formatGoalTime(goal);
       const completedInfo = goal.completedAt ? ` (完成于 ${timeInfo})` : '';

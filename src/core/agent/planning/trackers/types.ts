@@ -80,7 +80,6 @@ export interface Tracker {
   destroy?(): void;
 }
 
-
 /**
  * CollectionTracker配置
  * 基于 playerCollect 事件追踪新收集的物品

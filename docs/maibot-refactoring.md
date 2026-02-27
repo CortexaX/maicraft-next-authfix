@@ -9,6 +9,7 @@
 ### 1. 目录结构优化
 
 **之前**：
+
 ```
 src/core/agent/
   ├─ MaibotCommunicator.ts  ❌ 单文件，不方便扩展
@@ -17,6 +18,7 @@ src/core/agent/
 ```
 
 **之后**：
+
 ```
 src/core/agent/
   ├─ communication/         ✅ 专门的通信目录
@@ -27,6 +29,7 @@ src/core/agent/
 ```
 
 **优势**：
+
 - 模块化更清晰
 - 方便后续扩展其他通信方式
 - 符合项目的目录组织规范
@@ -34,16 +37,19 @@ src/core/agent/
 ### 2. 命名优化
 
 **之前**：
+
 ```typescript
 private maibotCommunicator: MaibotCommunicator;  // ❌ 太长
 ```
 
 **之后**：
+
 ```typescript
 private maiBotClient: MaiBotClient;  // ✅ 简洁清晰
 ```
 
 **优势**：
+
 - 更简短易读
 - 符合命名规范（Client 后缀表明是客户端）
 - 与其他客户端命名一致
@@ -51,6 +57,7 @@ private maiBotClient: MaiBotClient;  // ✅ 简洁清晰
 ### 3. 依赖注入集成
 
 **之前**：Agent 手动管理生命周期
+
 ```typescript
 // Agent.ts - 手动初始化 ❌
 if (this.state.config.maibot.enabled) {
@@ -66,6 +73,7 @@ if (this.maibotCommunicator) {
 ```
 
 **之后**：依赖注入容器自动管理
+
 ```typescript
 // bootstrap.ts - 自动管理 ✅
 container
@@ -74,10 +82,10 @@ container
     return new MaiBotClient(config.maibot);
   })
   .withInitializer(ServiceKeys.MaiBotClient, async (client: any) => {
-    await client.start();  // 自动启动
+    await client.start(); // 自动启动
   })
   .withDisposer(ServiceKeys.MaiBotClient, async (client: any) => {
-    await client.stop();   // 自动停止
+    await client.stop(); // 自动停止
   });
 
 // Agent.ts - 无需手动管理 ✅
@@ -85,6 +93,7 @@ container
 ```
 
 **优势**：
+
 - 生命周期管理统一
 - 代码更简洁
 - 减少重复代码
@@ -94,10 +103,11 @@ container
 ### 4. 服务注册
 
 **新增**：ServiceKeys.ts
+
 ```typescript
 export const ServiceKeys = {
   // ...
-  MaiBotClient: Symbol('MaiBotClient'),  // ✅ 新增服务键
+  MaiBotClient: Symbol('MaiBotClient'), // ✅ 新增服务键
   // ...
 };
 
@@ -109,6 +119,7 @@ export interface ServiceTypeMap {
 ```
 
 **优势**：
+
 - 类型安全
 - 统一管理
 - IDE 自动补全
@@ -116,6 +127,7 @@ export interface ServiceTypeMap {
 ### 5. 自动依赖注入
 
 **MemoryManager** 自动接收 MaiBotClient：
+
 ```typescript
 // bootstrap.ts
 container.registerSingleton(ServiceKeys.MemoryManager, c => {
@@ -123,13 +135,13 @@ container.registerSingleton(ServiceKeys.MemoryManager, c => {
   const config = c.resolve<AppConfig>(ServiceKeys.Config);
   const memory = new MemoryManager();
   memory.setBotConfig(config);
-  
+
   // 自动注入 MaiBotClient（如果启用）
   if (config.maibot.enabled) {
     const maibotClient = c.resolve(ServiceKeys.MaiBotClient);
-    memory.setMaiBotClient(maibotClient);  // ✅ 自动注入
+    memory.setMaiBotClient(maibotClient); // ✅ 自动注入
   }
-  
+
   return memory;
 });
 ```
@@ -137,14 +149,17 @@ container.registerSingleton(ServiceKeys.MemoryManager, c => {
 ## 文件变更总结
 
 ### 新增文件
+
 - ✅ `src/core/agent/communication/MaiBotClient.ts`
 - ✅ `src/core/agent/communication/index.ts`
 - ✅ `docs/maibot-refactoring.md`
 
 ### 删除文件
+
 - ❌ `src/core/agent/MaibotCommunicator.ts` （已移动并改名）
 
 ### 修改文件
+
 - ✏️ `src/core/di/ServiceKeys.ts` - 添加服务键
 - ✏️ `src/core/di/bootstrap.ts` - 注册服务
 - ✏️ `src/core/agent/memory/MemoryManager.ts` - 使用新名称
@@ -212,11 +227,13 @@ container.registerSingleton(ServiceKeys.MemoryManager, c => {
 ### 1. 导入路径更新
 
 **之前**：
+
 ```typescript
 import { MaibotCommunicator } from '@/core/agent/MaibotCommunicator';
 ```
 
 **之后**：
+
 ```typescript
 import { MaiBotClient } from '@/core/agent/communication';
 // 或
@@ -226,11 +243,13 @@ import { MaiBotClient } from '@/core/agent/communication/MaiBotClient';
 ### 2. 类名更新
 
 **之前**：
+
 ```typescript
 const comm = new MaibotCommunicator(config);
 ```
 
 **之后**：
+
 ```typescript
 const client = new MaiBotClient(config);
 ```
@@ -238,12 +257,14 @@ const client = new MaiBotClient(config);
 ### 3. 方法名更新
 
 **之前**：
+
 ```typescript
 memory.setMaibotCommunicator(comm);
 const comm = memory.getMaibotCommunicator();
 ```
 
 **之后**：
+
 ```typescript
 memory.setMaiBotClient(client);
 const client = memory.getMaiBotClient();
@@ -252,6 +273,7 @@ const client = memory.getMaiBotClient();
 ### 4. 使用依赖注入（推荐）
 
 **之前**（手动创建）：
+
 ```typescript
 const config = loadConfig();
 const client = new MaiBotClient(config.maibot);
@@ -259,6 +281,7 @@ await client.start();
 ```
 
 **之后**（使用容器）：
+
 ```typescript
 const client = container.resolve<MaiBotClient>(ServiceKeys.MaiBotClient);
 // 已自动启动，无需手动调用 start()
@@ -285,16 +308,19 @@ const client = container.resolve<MaiBotClient>(ServiceKeys.MaiBotClient);
 ## 优势总结
 
 ### 代码质量
+
 - ✅ 更符合项目规范
 - ✅ 代码更简洁（Agent.ts 减少 ~30 行）
 - ✅ 职责更清晰（分离创建和使用）
 
 ### 可维护性
+
 - ✅ 统一的生命周期管理
 - ✅ 易于测试（可 mock 依赖）
 - ✅ 易于扩展（添加新通信方式）
 
 ### 可靠性
+
 - ✅ 自动依赖解析
 - ✅ 统一错误处理
 - ✅ 防止忘记启动/停止
@@ -311,4 +337,3 @@ const client = container.resolve<MaiBotClient>(ServiceKeys.MaiBotClient);
 ## 总结
 
 此次重构完全遵循项目的依赖注入规范，提升了代码质量和可维护性，同时保持了完全的向后兼容性。重构后的代码更简洁、更清晰、更易于扩展。
-

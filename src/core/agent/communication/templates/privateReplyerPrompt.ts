@@ -21,5 +21,5 @@ export const privateReplyerPrompt = {
 {reply_style}
 请注意不要输出多余内容(包括前后缀，冒号和引号，括号，表情等)，只输出回复内容。
 {moderation_prompt}不要输出多余内容(包括前后缀，冒号和引号，括号，表情包，at或 @等 )。`,
-  description: '虚拟主播私信回复生成提示词模板'
+  description: '虚拟主播私信回复生成提示词模板',
 } as const;

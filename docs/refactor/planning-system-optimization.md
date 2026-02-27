@@ -7,15 +7,16 @@
 ## 摘要
 
 ### 核心问题
+
 当前系统最主要的问题是**任务表现不稳定**，经常生成无意义或无法完成的任务。根本原因在于Tracker系统过于简单，无法准确判断任务状态。
 
 ### 聚焦优化
 
-| 优化项 | 优先级 | 核心价值 | 实施难度 |
-|-------|--------|----------|----------|
-| 增强Tracker系统 | 最高 | 提升任务完成率30% | 中 |
-| 简化为Goal-Task两层 | 高 | 减少架构复杂度 | 中 |
-| 历史分析结构化 | 中 | 避免重复失败 | 低 |
+| 优化项              | 优先级 | 核心价值          | 实施难度 |
+| ------------------- | ------ | ----------------- | -------- |
+| 增强Tracker系统     | 最高   | 提升任务完成率30% | 中       |
+| 简化为Goal-Task两层 | 高     | 减少架构复杂度    | 中       |
+| 历史分析结构化      | 中     | 避免重复失败      | 低       |
 
 ### 实施路线图
 
@@ -58,6 +59,7 @@
 #### 新增Tracker类型
 
 **1. RegionTracker - 区域/结构检测**
+
 ```typescript
 interface RegionTracker {
   type: "region"
@@ -78,6 +80,7 @@ interface RegionTracker {
 ```
 
 **2. ExploreTracker - 探索任务**
+
 ```typescript
 interface ExploreTracker {
   type: "explore"
@@ -105,6 +108,7 @@ interface ExploreTracker {
 ```
 
 **3. ConditionTracker - 条件检测**
+
 ```typescript
 interface ConditionTracker {
   type: "condition"
@@ -150,6 +154,7 @@ interface ConditionTracker {
 ```
 
 **4. StructureTracker - 结构验证**
+
 ```typescript
 interface StructureTracker {
   type: "structure"
@@ -196,6 +201,7 @@ interface StructureFeature {
 ```
 
 **5. EnhancedCollectionTracker - 增强物品收集追踪**
+
 ```typescript
 interface EnhancedCollectionTracker {
   type: "enhanced_collection"
@@ -232,12 +238,13 @@ interface EnhancedCollectionTracker {
 ```
 
 #### 改进的CompositeTracker
+
 ```typescript
 interface CompositeTracker {
-  type: "composite"
-  operator: "and" | "or" | "sequence" | "at_least_n"
-  trackers: any[]
-  weights?: number[] // 各条件权重
+  type: 'composite';
+  operator: 'and' | 'or' | 'sequence' | 'at_least_n';
+  trackers: any[];
+  weights?: number[]; // 各条件权重
 }
 ```
 
@@ -275,6 +282,7 @@ interface CompositeTracker {
 #### 实际例子对比
 
 **之前的问题任务**：
+
 ```
 任务: "建造一个房子"
 错误Tracker: {
@@ -286,6 +294,7 @@ interface CompositeTracker {
 ```
 
 **改进后的任务**：
+
 ```
 任务: "建造一个简单的房子"
 正确Tracker: {
@@ -320,9 +329,11 @@ interface CompositeTracker {
 ### 2. 架构简化：三层变两层
 
 #### 当前问题
+
 Plan层职责单薄，仅作为Task的容器，增加了架构复杂度但没有带来相应价值。
 
 #### 简化方案
+
 ```
 TaskManager
 ├── Goal (轻量级标签)
@@ -341,11 +352,13 @@ TaskManager
 ```
 
 #### 关键变更
+
 - **移除Plan类** - 将其职责合并到Goal和Task
 - **增强Task** - 直接包含tracker、依赖、优先级
 - **Goal降级** - 仅作为任务分组标签
 
 #### 数据迁移
+
 ```typescript
 // 迁移脚本示例
 function migratePlanToGoal(oldPlan: Plan): Goal {
@@ -353,7 +366,7 @@ function migratePlanToGoal(oldPlan: Plan): Goal {
     ...task,
     goalId: oldPlan.goalId, // Task直接关联Goal
     // 保留其他属性
-  }))
+  }));
 
   return {
     id: oldPlan.goalId,
@@ -361,9 +374,9 @@ function migratePlanToGoal(oldPlan: Plan): Goal {
     taskIds: tasks.map(t => t.id),
     metadata: {
       originalPlanId: oldPlan.id,
-      createdAt: oldPlan.createdAt
-    }
-  }
+      createdAt: oldPlan.createdAt,
+    },
+  };
 }
 ```
 
@@ -372,43 +385,46 @@ function migratePlanToGoal(oldPlan: Plan): Goal {
 ### 3. 历史分析结构化：避免重复失败
 
 #### 核心思路
+
 不是简单的数据压缩，而是**智能失败模式识别**和**自动改进建议**。
 
 #### 失败模式库
+
 ```typescript
 const FailurePatterns = {
   RECURSIVE_CRAFT: {
-    pattern: "缺少X -> 需要合成X -> 缺少Y -> 需要合成Y -> ...",
-    detection: (history) => {
-      const chains = history.extractCraftChains()
-      return chains.filter(chain => chain.depth > 3).length > 0
+    pattern: '缺少X -> 需要合成X -> 缺少Y -> 需要合成Y -> ...',
+    detection: history => {
+      const chains = history.extractCraftChains();
+      return chains.filter(chain => chain.depth > 3).length > 0;
     },
-    suggestion: "一次性收集所有原材料，避免递归合成"
+    suggestion: '一次性收集所有原材料，避免递归合成',
   },
 
   UNREACHABLE_LOCATION: {
-    pattern: "位置目标被阻挡 -> 重新规划 -> 仍然被阻挡",
-    detection: (history) => {
-      return history.countAttempts('location_blocked') >= 2
+    pattern: '位置目标被阻挡 -> 重新规划 -> 仍然被阻挡',
+    detection: history => {
+      return history.countAttempts('location_blocked') >= 2;
     },
-    suggestion: "检查目标位置是否合理，或使用工具改造地形"
+    suggestion: '检查目标位置是否合理，或使用工具改造地形',
   },
 
   RESOURCE_EXHAUSTION: {
-    pattern: "收集任务 -> 资源用完 -> 任务失败",
-    detection: (history) => {
-      return history.hasResourceConsumptionIssue()
+    pattern: '收集任务 -> 资源用完 -> 任务失败',
+    detection: history => {
+      return history.hasResourceConsumptionIssue();
     },
-    suggestion: "预估资源需求，准备足够的原材料"
-  }
-}
+    suggestion: '预估资源需求，准备足够的原材料',
+  },
+};
 ```
 
 #### 实时失败检测
+
 ```typescript
 class FailurePatternDetector {
   analyze(task: Task, history: TaskHistory): FailureAnalysis {
-    const issues = []
+    const issues = [];
 
     // 检测各种失败模式
     for (const [name, pattern] of Object.entries(FailurePatterns)) {
@@ -417,51 +433,47 @@ class FailurePatternDetector {
           type: name,
           description: pattern.pattern,
           suggestion: pattern.suggestion,
-          confidence: this.calculateConfidence(name, history)
-        })
+          confidence: this.calculateConfidence(name, history),
+        });
       }
     }
 
     return {
       hasPattern: issues.length > 0,
       patterns: issues,
-      recommendation: this.getBestSuggestion(issues)
-    }
+      recommendation: this.getBestSuggestion(issues),
+    };
   }
 
   private getBestSuggestion(issues: FailureIssue[]): string {
     // 根据置信度和影响程度选择最佳建议
-    return issues
-      .sort((a, b) => b.confidence - a.confidence)[0]
-      ?.suggestion || "继续执行当前计划"
+    return issues.sort((a, b) => b.confidence - a.confidence)[0]?.suggestion || '继续执行当前计划';
   }
 }
 ```
 
 #### 集成到决策循环
+
 ```typescript
 // 在MainDecisionLoop中集成
 const decisionLoop = {
   async execute(): Promise<Decision> {
     // 获取历史分析
-    const failureAnalysis = this.failureDetector.analyze(
-      this.currentTask,
-      this.taskHistory
-    )
+    const failureAnalysis = this.failureDetector.analyze(this.currentTask, this.taskHistory);
 
     // 如果检测到失败模式，提供建议
     if (failureAnalysis.hasPattern) {
-      this.logger.warn(`检测到失败模式: ${failureAnalysis.patterns[0].type}`)
-      this.logger.info(`建议: ${failureAnalysis.recommendation}`)
+      this.logger.warn(`检测到失败模式: ${failureAnalysis.patterns[0].type}`);
+      this.logger.info(`建议: ${failureAnalysis.recommendation}`);
 
       // 可以选择自动调整或提供给LLM
-      return this.adjustTaskBasedOnPattern(failureAnalysis)
+      return this.adjustTaskBasedOnPattern(failureAnalysis);
     }
 
     // 正常执行
-    return await this.makeNormalDecision()
-  }
-}
+    return await this.makeNormalDecision();
+  },
+};
 ```
 
 ---
@@ -471,6 +483,7 @@ const decisionLoop = {
 ### 第一阶段：Tracker系统增强（3周）
 
 **任务清单**：
+
 1. 重构Tracker基类，增加CompletionResult返回类型 (3天)
 2. 实现SmartCollectionTracker (4天)
 3. 实现SmartLocationTracker (4天)
@@ -479,6 +492,7 @@ const decisionLoop = {
 6. 性能测试和优化 (2天)
 
 **验收标准**：
+
 - 任务完成率提升30%以上
 - Tracker能提供有用的失败原因
 - 无明显性能下降
@@ -486,6 +500,7 @@ const decisionLoop = {
 ### 第二阶段：架构简化（2周）
 
 **任务清单**：
+
 1. 设计新的TaskManager接口 (2天)
 2. 实现Goal-Task迁移逻辑 (3天)
 3. 重构GoalPlanningManager为TaskManager (3天)
@@ -493,6 +508,7 @@ const decisionLoop = {
 5. 集成测试 (1天)
 
 **验收标准**：
+
 - 代码行数减少30%
 - 所有现有功能正常工作
 - 通过单元测试
@@ -500,12 +516,14 @@ const decisionLoop = {
 ### 第三阶段：历史分析结构化（1周）
 
 **任务清单**：
+
 1. 实现失败模式库 (2天)
 2. 实现失败模式检测器 (2天)
 3. 集成到决策循环 (2天)
 4. 测试和调优 (1天)
 
 **验收标准**：
+
 - 能识别常见的失败模式
 - 提供有用的改进建议
 - 减少重复失败50%以上
@@ -514,18 +532,19 @@ const decisionLoop = {
 
 ## 预期收益
 
-| 指标 | 当前值 | 目标值 | 提升 |
-|------|--------|--------|------|
-| 任务完成率 | ~60% | ~90% | +50% |
-| 无意义任务比例 | ~30% | ~5% | -83% |
-| 代码复杂度 | 基准 | -30% | -30% |
-| 重复失败率 | 基准 | -50% | -50% |
+| 指标           | 当前值 | 目标值 | 提升 |
+| -------------- | ------ | ------ | ---- |
+| 任务完成率     | ~60%   | ~90%   | +50% |
+| 无意义任务比例 | ~30%   | ~5%    | -83% |
+| 代码复杂度     | 基准   | -30%   | -30% |
+| 重复失败率     | 基准   | -50%   | -50% |
 
 ---
 
 ## 结论
 
 本方案聚焦于最核心的问题：**提升任务表现**。通过增强Tracker系统，让系统能够：
+
 1. 准确判断任务状态
 2. 提供有用的反馈信息
 3. 避免重复失败

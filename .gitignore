@@ -150,3 +150,5 @@ config.toml
 data/
 
 .qoder/
+.omc/
+.cursor/

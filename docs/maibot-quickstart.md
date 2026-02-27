@@ -54,6 +54,7 @@ pnpm dev
 ### Q: 如何查看发送的消息？
 
 A: 在日志中搜索：
+
 - `📤 准备发送思考记忆`
 - `📤 准备发送决策记忆`
 - `✅ 已发送记忆消息`
@@ -61,12 +62,14 @@ A: 在日志中搜索：
 ### Q: 如何查看 MaiBot 回复？
 
 A: 在日志中搜索：
+
 - `📨 收到 MaiBot 回复`
 - 思考记忆中会出现 `[MaiBot回复]` 标记
 
 ### Q: 连接失败怎么办？
 
 A: 检查以下项：
+
 1. MaiBot 是否启动
 2. WebSocket 地址和端口是否正确
 3. API 密钥是否一致
@@ -75,6 +78,7 @@ A: 检查以下项：
 ### Q: 如何临时禁用？
 
 A: 在 `config.toml` 中设置：
+
 ```toml
 [maibot]
 enabled = false  # 设为 false
@@ -112,4 +116,3 @@ max_reconnect_attempts = 20  # 最多重连20次（默认10次）
 - 查看完整文档：`docs/maibot-communication.md`
 - 了解消息格式和高级功能
 - 自定义消息处理逻辑
-

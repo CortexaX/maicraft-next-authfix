@@ -140,6 +140,7 @@ interface ContainerItem {
    - ✅ 不需要手动清理距离过远的缓存
 
 3. **定期扫描（可选，默认关闭）**
+
    ```typescript
    config: {
      enablePeriodicScan: false, // 默认关闭，区块事件已足够
