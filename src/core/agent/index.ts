@@ -50,3 +50,7 @@ export { EntityTracker } from './planning/trackers/EntityTracker';
 export { EnvironmentTracker } from './planning/trackers/EnvironmentTracker';
 export { CompositeTracker } from './planning/trackers/CompositeTracker';
 export { TrackerFactory } from './planning/trackers/TrackerFactory';
+
+// Tool Registry
+export { ToolRegistry } from './tool/ToolRegistry';
+export type { ToolSchema } from './tool/ToolRegistry';
