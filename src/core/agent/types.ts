@@ -3,10 +3,11 @@
  */
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
-import type { ModeManager } from './mode/ModeManager';
 import type { MemoryManager } from './memory/MemoryManager';
 import type { InterruptController } from './InterruptController';
 import type { AppConfig as Config } from '@/utils/Config';
+import type { InterruptSystem } from './interrupt/InterruptSystem';
+import type { ToolRegistry } from './tool/ToolRegistry';
 
 /**
  * Agent 共享状态
@@ -21,12 +22,15 @@ export interface AgentState {
   readonly context: RuntimeContext;
 
   // 子系统
-  readonly modeManager: ModeManager;
   readonly memory: MemoryManager;
   readonly llmManager: any; // LLMManager 类型
 
   // 中断控制
   readonly interrupt: InterruptController;
+
+  // 新架构组件（可选，用于外部访问）
+  readonly interruptSystem?: InterruptSystem;
+  readonly toolRegistry?: ToolRegistry;
 
   // 配置
   readonly config: Config;

@@ -379,10 +379,9 @@ export function configureServices(container: Container): void {
       const config = c.resolve<AppConfig>(ServiceKeys.Config);
       const logger = c.resolve<Logger>(ServiceKeys.Logger);
       const memory = await c.resolveAsync(ServiceKeys.MemoryManager);
-      const modeManager = c.resolve(ServiceKeys.ModeManager);
       const interrupt = c.resolve(ServiceKeys.InterruptController);
 
-      return new Agent(bot, executor, llmManager, config, memory, modeManager, interrupt, logger);
+      return new Agent(bot, executor, llmManager, config, memory, interrupt, logger);
     })
     .withInitializer(ServiceKeys.Agent, async (agent: any) => {
       await agent.initialize();

@@ -1,29 +1,40 @@
 /**
  * Agent 主类
  * 整个 AI 系统的入口和协调者
+ *
+ * 新架构：ReAct + 中断 + 工具
+ * - 使用 AgentLoop 替代 MainDecisionLoop
+ * - 使用 InterruptSystem 替代 ModeManager
+ * - 使用 ToolRegistry 将 Action 转换为 function-calling
  */
 
 import { getLogger } from '@/utils/Logger';
 import type { Logger } from '@/utils/Logger';
 import type { Bot } from 'mineflayer';
 import type { AppConfig as Config } from '@/utils/Config';
-import type { AgentState, AgentStatus, GameContext } from './types';
+import type { AgentState, AgentStatus } from './types';
 import { InterruptController } from './InterruptController';
 import { MemoryManager } from './memory/MemoryManager';
-import { ModeManager } from './mode/ModeManager';
-import { MainDecisionLoop } from './loop/MainDecisionLoop';
+import { AgentLoop } from './loop/AgentLoop';
 import { ChatLoop } from './loop/ChatLoop';
 import { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { PromptDataCollector } from './prompt/PromptDataCollector';
 import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
+import { ToolRegistry } from '@/core/agent/tool/ToolRegistry';
+import { InterruptSystem } from '@/core/agent/interrupt/InterruptSystem';
+import { CombatHandler } from '@/core/agent/interrupt/CombatHandler';
 
 export class Agent {
   // 共享状态（只读）
   readonly state: AgentState;
 
   // 决策系统（作为内部组件，不暴露）
-  private mainLoop: MainDecisionLoop;
+  private agentLoop: AgentLoop;
   private chatLoop: ChatLoop;
+
+  // 新架构组件
+  private toolRegistry: ToolRegistry;
+  private interruptSystem: InterruptSystem;
 
   // 数据收集器
   private dataCollector: PromptDataCollector;
@@ -45,7 +56,6 @@ export class Agent {
     llmManager: any,
     config: Config,
     memory: MemoryManager,
-    modeManager: ModeManager,
     interrupt: InterruptController,
     logger?: Logger,
   ) {
@@ -58,22 +68,24 @@ export class Agent {
     // 从外部注入的组件构建状态
     const context = this.executor.getContextManager().getContext();
 
+    // 创建新架构组件
+    this.toolRegistry = new ToolRegistry(executor, context);
+    this.interruptSystem = new InterruptSystem(context.gameState);
+
     this.state = {
       goal: config.agent?.goal || '探索世界',
       isRunning: false,
       context,
-      modeManager,
       memory,
       llmManager: this.llmManager,
       interrupt,
+      interruptSystem: this.interruptSystem,
+      toolRegistry: this.toolRegistry,
       config,
     };
 
-    // 绑定状态到 ModeManager
-    this.state.modeManager.bindState(this.state);
-
     // 创建决策循环（依赖 AgentState，在这里创建）
-    this.mainLoop = new MainDecisionLoop(this.state, this.llmManager);
+    this.agentLoop = new AgentLoop(this.state, this.llmManager, this.toolRegistry, this.interruptSystem);
     this.chatLoop = new ChatLoop(this.state, this.llmManager);
 
     // 初始化数据收集器
@@ -121,7 +133,7 @@ export class Agent {
       if (this.state.context.goalManager && this.state.context.taskManager) {
         const context = this.executor.getContextManager().getContext();
         const { TrackerFactory } = await import('@/core/agent/planning/trackers/TrackerFactory');
-        const trackerFactory = new TrackerFactory(context.eventManager);
+        const trackerFactory = new TrackerFactory(context.events);
 
         await this.state.context.goalManager.load('./data', trackerFactory);
         await this.state.context.taskManager.load('./data', trackerFactory);
@@ -141,8 +153,10 @@ export class Agent {
         }
       }
 
-      // 注册所有模式
-      await this.state.modeManager.registerModes();
+      // 注册中断处理器（取代模式注册）
+      const combatHandler = new CombatHandler(this.executor, this.state.memory, this.state.context.gameState);
+      this.interruptSystem.register(combatHandler);
+      this.logger.info('✅ 战斗中断处理器已注册');
 
       this.logger.info('✅ Agent 初始化完成');
     } catch (error) {
@@ -166,11 +180,8 @@ export class Agent {
     this.logger.info('🚀 Agent 启动中...');
 
     try {
-      // 设置初始模式
-      await this.state.modeManager.setMode(ModeManager.MODE_TYPES.MAIN, '初始化');
-
-      // 启动决策循环
-      this.mainLoop.start();
+      // 直接启动决策循环，不再需要设置初始模式
+      this.agentLoop.start();
       this.chatLoop.start();
 
       this.logger.info('✅ Agent 启动完成');
@@ -197,7 +208,7 @@ export class Agent {
     this.state.isRunning = false;
 
     // 停止决策循环
-    this.mainLoop.stop();
+    this.agentLoop.stop();
     this.chatLoop.stop();
 
     // 保存状态
@@ -221,98 +232,16 @@ export class Agent {
   }
 
   /**
-   * 处理目标完成事件（已废弃 - 新系统使用自动检测）
-   * 保留空方法以兼容旧代码引用
-   */
-  private handleGoalCompletion(_goal: any): void {
-    // 新系统中目标完成由goalManager自动检测和记录
-    // LLM会在prompt中看到goal_completed_hint并自主设定新目标
-  }
-
-  /**
-   * 基于完成的目标自动生成新目标（已废弃 - 新系统使用LLM自主决策）
-   */
-  private async generateNewGoalAfterCompletion(_completedGoal: any): Promise<void> {
-    // 新系统中，LLM会在看到goal_completed_hint后自主设定新目标
-    // 不需要程序主动生成
-  }
-
-  /**
-   * 收集当前环境数据，用于目标生成
-   */
-  private collectEnvironmentData(): any {
-    const gameState = this.state.context.gameState;
-    // 使用PromptDataCollector收集的基础信息，获得格式化的数据
-    const basicInfo = this.dataCollector.collectBasicInfo();
-
-    return {
-      position: basicInfo.position, // "位置: (x, y, z)"
-      health: gameState.health || 20,
-      food: gameState.food || 20,
-      inventory: basicInfo.inventory_info, // 格式化的物品栏信息
-      time: gameState.timeOfDay > 12000 ? '夜晚' : '白天',
-      environment: gameState.getStatusDescription(), // 完整的状态描述
-    };
-  }
-
-  /**
-   * 获取已完成目标的历史（已废弃）
-   */
-  private getCompletedGoalsHistory(): any[] {
-    // 新系统中可以从goalManager获取，但目前不需要
-    return [];
-  }
-
-  /**
-   * 使用LLM生成新目标（已废弃）
-   */
-  private async generateGoalWithLLM(_completedGoal: any, _environmentData: any, _completedGoalsHistory: any[]): Promise<any> {
-    // 新系统中由LLM通过plan_action自主创建目标
-    return null;
-  }
-
-  /**
-   * 创建新目标并自动生成计划（已废弃）
-   */
-  private async attemptToCreateNewGoal(): Promise<void> {
-    // 新系统中由LLM通过plan_action自主创建目标
-  }
-
-  /**
-   * 为新目标生成计划
-   */
-  private async generatePlanForNewGoal(goal: Goal): Promise<void> {
-    try {
-      this.logger.info('📋 正在为新目标生成计划...');
-
-      // 调用规划管理器的计划生成方法
-      const success = await this.state.planningManager.generatePlanForCurrentGoal();
-
-      if (success) {
-        this.logger.info('✅ 新目标的计划已生成完成');
-      } else {
-        this.logger.warn('⚠️ 新目标的计划生成失败');
-        this.state.memory.recordThought('⚠️ 新目标计划生成失败，可能需要手动规划', {
-          goal: goal.description,
-        });
-      }
-    } catch (error) {
-      this.logger.error('为新目标生成计划失败:', {}, error as Error);
-    }
-  }
-
-  /**
    * 设置事件监听（游戏逻辑相关）
    */
   private setupEventListeners(): void {
-    const { context, interrupt, modeManager } = this.state;
+    const { context, interrupt } = this.state;
 
-    // 受伤事件 - 切换到战斗模式
+    // 受伤事件 - 不再切换模式，由 InterruptSystem 在下一轮检测
     context.events.on('entityHurt', async (data: any) => {
       if (data.entity?.id === context.bot.entity?.id) {
-        // 只有当受伤的是自己时才切换模式
-        await modeManager.trySetMode(ModeManager.MODE_TYPES.COMBAT, '受到攻击');
-        this.state.memory.recordThought('⚔️ 受到攻击，切换到战斗模式', { entity: data.entity });
+        this.state.memory.recordThought('⚔️ 受到攻击', { entity: data.entity });
+        // InterruptSystem 会在下一轮循环检测到威胁
       }
     });
 
@@ -379,7 +308,7 @@ export class Agent {
 
     return {
       isRunning: this.isRunning,
-      currentMode: this.state.modeManager.getCurrentMode(),
+      currentMode: this.interruptSystem.isHandling() ? 'interrupt' : 'normal',
       goal: currentGoal?.content || this.state.goal,
       currentTask: null, // 新系统中不再有单一的currentTask概念
       interrupted: this.state.interrupt.isInterrupted(),
