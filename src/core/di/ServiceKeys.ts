@@ -38,16 +38,11 @@ export const ServiceKeys = {
   MemoryManager: Symbol('MemoryManager'),
   GoalManager: Symbol('GoalManager'),
   TaskManager: Symbol('TaskManager'),
-  ModeManager: Symbol('ModeManager'),
   InterruptController: Symbol('InterruptController'),
   MaiBotClient: Symbol('MaiBotClient'),
 
   // 决策循环
-  MainDecisionLoop: Symbol('MainDecisionLoop'),
   ChatLoop: Symbol('ChatLoop'),
-
-  // 结构化输出
-  StructuredOutputManager: Symbol('StructuredOutputManager'),
 
   // 工厂服务
   TrackerFactory: Symbol('TrackerFactory'),
@@ -103,12 +98,9 @@ export interface ServiceTypeMap {
   [ServiceKeys.MemoryManager]: import('@/core/agent/memory/MemoryManager').MemoryManager;
   [ServiceKeys.GoalManager]: import('@/core/agent/planning/goal/GoalManager').GoalManager;
   [ServiceKeys.TaskManager]: import('@/core/agent/planning/task/TaskManager').TaskManager;
-  [ServiceKeys.ModeManager]: import('@/core/agent/mode/ModeManager').ModeManager;
   [ServiceKeys.InterruptController]: import('@/core/agent/InterruptController').InterruptController;
   [ServiceKeys.MaiBotClient]: import('@/core/agent/communication/MaiBotClient').MaiBotClient;
-  [ServiceKeys.MainDecisionLoop]: import('@/core/agent/loop/MainDecisionLoop').MainDecisionLoop;
   [ServiceKeys.ChatLoop]: import('@/core/agent/loop/ChatLoop').ChatLoop;
-  [ServiceKeys.StructuredOutputManager]: import('@/core/agent/structured/StructuredOutputManager').StructuredOutputManager;
   [ServiceKeys.TrackerFactory]: import('@/core/agent/planning/trackers/TrackerFactory').TrackerFactory;
   [ServiceKeys.LoggerFactory]: import('@/utils/Logger').LoggerFactory;
   [ServiceKeys.ConfigLoader]: import('@/utils/Config').ConfigLoader;

@@ -2,17 +2,17 @@
  * Agent 系统导出
  */
 
+// Core
 export { Agent } from './Agent';
 export { InterruptController } from './InterruptController';
 export { MemoryManager } from './memory/MemoryManager';
-export { ModeManager } from './mode/ModeManager';
-export { ModeType } from './mode/types';
-export { MainDecisionLoop } from './loop/MainDecisionLoop';
+export { AgentLoop } from './loop/AgentLoop';
 export { ChatLoop } from './loop/ChatLoop';
+export { InterruptSystem } from './interrupt/InterruptSystem';
 
 // Types
 export type { AgentState, AgentStatus, ActionCall, GameContext } from './types';
-export type { ModeTransitionRule } from './mode/types';
+export type { InterruptHandler } from './interrupt/types';
 export type {
   MemoryStore,
   ThoughtEntry,

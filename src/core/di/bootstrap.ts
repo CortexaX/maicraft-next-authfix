@@ -274,14 +274,6 @@ export function configureServices(container: Container): void {
       await memory.saveAll();
     });
 
-  // ModeManager (单例)
-  container.registerSingleton(ServiceKeys.ModeManager, c => {
-    const { ModeManager } = require('@/core/agent/mode/ModeManager');
-    const executor = c.resolve(ServiceKeys.ActionExecutor) as any;
-    const context = executor.getContextManager().getContext();
-    return new ModeManager(context);
-  });
-
   // InterruptController (单例)
   container.registerSingleton(ServiceKeys.InterruptController, c => {
     const { InterruptController } = require('@/core/agent/InterruptController');
@@ -292,15 +284,6 @@ export function configureServices(container: Container): void {
   container.registerSingleton(ServiceKeys.InterruptSignal, c => {
     const { InterruptSignal } = require('@/core/interrupt/InterruptSignal');
     return new InterruptSignal();
-  });
-
-  // StructuredOutputManager (瞬态 - 每次创建新实例)
-  container.registerTransient(ServiceKeys.StructuredOutputManager, c => {
-    const { StructuredOutputManager } = require('@/core/agent/structured/StructuredOutputManager');
-    const llmManager = c.resolve(ServiceKeys.LLMManager);
-    return new StructuredOutputManager(llmManager, {
-      useStructuredOutput: true,
-    });
   });
 
   // TrackerFactory (单例)
