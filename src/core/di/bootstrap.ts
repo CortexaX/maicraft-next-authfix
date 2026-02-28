@@ -118,18 +118,13 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 
   const nearbyBlockManager = new NearbyBlockManager(blockCache, bot);
 
-  const gameState = new GameState({
-    blockCache,
-    containerCache,
-    cacheManager,
-    nearbyBlockManager,
-  });
+  const gameState = new GameState();
 
   const goalManager = new GoalManager();
 
   const movementUtils = new MovementUtils(logger);
   const placeBlockUtils = new PlaceBlockUtils(logger, movementUtils);
-  const craftManager = new CraftManager(bot);
+  const craftManager = new CraftManager(bot, cacheManager);
 
   const contextManager = new ContextManager({
     bot,
@@ -139,6 +134,8 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     blockCache,
     containerCache,
     locationManager,
+    cacheManager,
+    nearbyBlockManager,
     signal: new AbortController().signal,
     placeBlockUtils,
     movementUtils,
@@ -201,9 +198,10 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 }
 
 export async function initializeServices(services: AppServices, bot: Bot, logger: Logger): Promise<void> {
-  services.gameState.initialize(bot);
-
   const events = services.actionExecutor.getEventManager();
+
+  services.gameState.initialize(bot, events);
+
   events.on('actionComplete', (data: any) => {
     logger.debug(`动作完成: ${data.actionName}`, {
       duration: data.duration,
@@ -247,6 +245,33 @@ export async function initializeServices(services: AppServices, bot: Bot, logger
   await services.agent.initialize();
 
   await services.wsServer.start();
+
+  await startCacheSystem(services, logger);
+}
+
+async function startCacheSystem(services: AppServices, logger: Logger): Promise<void> {
+  logger.info('启动缓存系统', {
+    hasCacheManager: !!services.cacheManager,
+    hasNearbyBlockManager: !!services.nearbyBlockManager,
+  });
+
+  try {
+    await services.blockCache.load();
+    await services.containerCache.load();
+
+    logger.info('缓存数据加载完成', {
+      blockCacheSize: services.blockCache.size(),
+      containerCacheSize: services.containerCache.size(),
+    });
+
+    services.cacheManager.start();
+    logger.info('缓存管理器已启动');
+
+    await services.cacheManager.triggerBlockScan();
+    logger.info('初始方块扫描完成');
+  } catch (error) {
+    logger.error('启动缓存系统失败', undefined, error as Error);
+  }
 }
 
 export async function disposeServices(services: AppServices): Promise<void> {
@@ -267,6 +292,10 @@ export async function disposeServices(services: AppServices): Promise<void> {
   services.llmManager.close();
 
   services.contextManager.cleanup();
+
+  services.cacheManager.destroy();
+  services.blockCache.destroy();
+  services.containerCache.destroy();
 }
 
 function registerActions(executor: ActionExecutor, logger: Logger): void {

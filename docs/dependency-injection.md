@@ -24,7 +24,6 @@ export interface AppServices {
   nearbyBlockManager: NearbyBlockManager;
   gameState: GameState;
   goalManager: GoalManager;
-  interruptSignal: InterruptSignal;
   movementUtils: MovementUtils;
   placeBlockUtils: PlaceBlockUtils;
   craftManager: CraftManager;
@@ -34,7 +33,8 @@ export interface AppServices {
   llmManager: LLMManager;
   maiBotClient?: MaiBotClient;
   memoryManager: MemoryManager;
-  interruptController: InterruptController;
+  memoryService: MemoryServiceImpl;
+  interruptManager: InterruptManager;
   trackerFactory: TrackerFactory;
   configLoader: ConfigLoader;
   promptManager: PromptManager;
@@ -90,11 +90,25 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
   const cacheManager = new CacheManager(bot, blockCache, containerCache, { ... });
   const nearbyBlockManager = new NearbyBlockManager(blockCache, bot);
 
-  const gameState = new GameState({
+  // GameState 不再需要缓存参数，它是纯粹的状态持有者
+  const gameState = new GameState();
+
+  // ContextManager 现在需要 cacheManager 和 nearbyBlockManager
+  const contextManager = new ContextManager({
+    bot,
+    config,
+    logger,
+    gameState,
     blockCache,
     containerCache,
+    locationManager,
     cacheManager,
     nearbyBlockManager,
+    signal: new AbortController().signal,
+    placeBlockUtils,
+    movementUtils,
+    craftManager,
+    goalManager,
   });
 
   return { blockCache, containerCache, locationManager, cacheManager, ... };
@@ -107,7 +121,14 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 
 ```typescript
 export async function initializeServices(services: AppServices, bot: Bot, logger: Logger): Promise<void> {
-  services.gameState.initialize(bot);
+  // 获取 EventManager（通过 ActionExecutor）
+  const events = services.actionExecutor.getEventManager();
+
+  // GameState 通过 EventManager 订阅事件，避免双重监听
+  services.gameState.initialize(bot, events);
+
+  // 启动缓存系统
+  await startCacheSystem(services, logger);
 
   if (services.maiBotClient) {
     await services.maiBotClient.start();
@@ -116,6 +137,13 @@ export async function initializeServices(services: AppServices, bot: Bot, logger
   await services.memoryManager.initialize();
   await services.agent.initialize();
   await services.wsServer.start();
+}
+
+async function startCacheSystem(services: AppServices, logger: Logger): Promise<void> {
+  await services.blockCache.load();
+  await services.containerCache.load();
+  services.cacheManager.start();
+  await services.cacheManager.triggerBlockScan();
 }
 ```
 
@@ -134,7 +162,14 @@ export async function disposeServices(services: AppServices): Promise<void> {
   }
 
   services.llmManager.close();
+
+  // 清理 ContextManager（包括 GameState 的事件监听）
   services.contextManager.cleanup();
+
+  // 销毁缓存系统
+  services.cacheManager.destroy();
+  services.blockCache.destroy();
+  services.containerCache.destroy();
 }
 ```
 
@@ -145,18 +180,47 @@ export async function disposeServices(services: AppServices): Promise<void> {
 所有依赖通过构造函数传入：
 
 ```typescript
+// GameState 不再需要缓存参数，它是纯粹的状态持有者
 class GameState {
-  readonly blockCache: BlockCache;
-  readonly containerCache: ContainerCache;
+  private logger: Logger;
+
+  playerName: string = '';
+  health: number = 20;
+  // ... 其他状态属性
+
+  constructor() {
+    this.logger = getLogger('GameState');
+  }
+
+  initialize(bot: Bot, events: EventManager): void {
+    // 通过 EventManager 订阅事件，避免双重监听
+  }
+}
+
+// ContextManager 现在需要 cacheManager 和 nearbyBlockManager
+class ContextManager {
+  private context: RuntimeContext;
 
   constructor(params: {
+    bot: Bot;
+    gameState: GameState;
     blockCache: BlockCache;
     containerCache: ContainerCache;
-    cacheManager: CacheManager;
-    nearbyBlockManager: NearbyBlockManager;
+    locationManager: LocationManager;
+    cacheManager: CacheManager; // 新增
+    nearbyBlockManager: NearbyBlockManager; // 新增
+    // ...
   }) {
-    this.blockCache = params.blockCache;
-    this.containerCache = params.containerCache;
+    this.context = {
+      bot: params.bot,
+      gameState: params.gameState,
+      blockCache: params.blockCache,
+      containerCache: params.containerCache,
+      locationManager: params.locationManager,
+      cacheManager: params.cacheManager,
+      nearbyBlockManager: params.nearbyBlockManager,
+      // ...
+    };
   }
 }
 ```
@@ -197,6 +261,32 @@ const blockCache = new BlockCache({
 });
 ```
 
+## RuntimeContext 结构
+
+RuntimeContext 是所有 Action 的上下文，包含所有必要的服务：
+
+```typescript
+export interface RuntimeContext {
+  bot: Bot;
+  executor: ActionExecutor | null;
+  gameState: GameState; // 玩家/环境状态
+  blockCache: BlockCache; // 方块缓存
+  containerCache: ContainerCache; // 容器缓存
+  locationManager: LocationManager; // 地标管理
+  cacheManager: CacheManager; // 缓存管理器
+  nearbyBlockManager: NearbyBlockManager; // 周边方块管理
+  events: EventManager; // 事件系统
+  signal: AbortSignal;
+  logger: Logger;
+  config: Config;
+  placeBlockUtils: PlaceBlockUtils;
+  movementUtils: MovementUtils;
+  craftManager: CraftManager;
+  goalManager: GoalManager;
+  llmManager?: LLMManager;
+}
+```
+
 ## 与 DI 容器的对比
 
 | 特性       | DI 容器        | Composition Root |
@@ -230,4 +320,4 @@ src/core/di/
 
 ---
 
-_这个文档展示了 Composition Root 模式的完整架构和使用方式。_
+_最后更新: 2026-02-28_

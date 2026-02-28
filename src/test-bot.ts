@@ -279,12 +279,7 @@ class MaicraftTestBot {
     const nearbyBlockManager = new NearbyBlockManager(blockCache, this.bot);
 
     const { GameState } = await import('./core/state/GameState');
-    const gameState = new GameState({
-      blockCache,
-      containerCache,
-      cacheManager,
-      nearbyBlockManager,
-    });
+    const gameState = new GameState();
 
     this.contextManager = new ContextManager({
       bot: this.bot,
@@ -294,15 +289,14 @@ class MaicraftTestBot {
       blockCache,
       containerCache,
       locationManager,
+      cacheManager,
+      nearbyBlockManager,
       signal: new AbortController().signal,
       placeBlockUtils,
       movementUtils,
       craftManager: undefined as any,
     });
     logger.info('✅ ContextManager 初始化完成');
-
-    gameState.initialize(this.bot);
-    logger.info('✅ GameState 初始化完成');
 
     this.executor = new ActionExecutor(this.contextManager, logger);
     this.contextManager.updateExecutor(this.executor);
@@ -311,6 +305,8 @@ class MaicraftTestBot {
     this.registerActions();
 
     const events = this.executor.getEventManager();
+    gameState.initialize(this.bot, events);
+    logger.info('✅ GameState 初始化完成');
 
     events.on('actionComplete', data => {
       logger.info(`✅ 动作完成: ${data.actionName} (${data.duration}ms)`);

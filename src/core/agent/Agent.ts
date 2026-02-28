@@ -125,7 +125,7 @@ export class Agent {
     try {
       // 初始化游戏状态（如果还没初始化）
       if (!(this.state.context.gameState as any).initialized) {
-        this.state.context.gameState.initialize(this.state.context.bot);
+        this.state.context.gameState.initialize(this.state.context.bot, this.state.context.events);
       }
 
       // 初始化记忆系统

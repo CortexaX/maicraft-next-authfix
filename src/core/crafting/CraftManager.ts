@@ -48,12 +48,18 @@ export class CraftManager {
   private bot: Bot;
   private mcData: any;
   private logger: Logger;
+  private cacheManager: any = null;
 
-  constructor(bot: Bot) {
+  constructor(bot: Bot, cacheManager?: any) {
     this.bot = bot;
     this.logger = getLogger('CraftManager');
+    this.cacheManager = cacheManager || null;
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.mcData = require('minecraft-data')(bot.version);
+  }
+
+  setCacheManager(cacheManager: any): void {
+    this.cacheManager = cacheManager;
   }
 
   /**
@@ -669,21 +675,12 @@ export class CraftManager {
       if (this.bot.currentWindow) {
         logger.warn(`检测到已打开的窗口，先关闭: ${this.bot.currentWindow.type}`);
         this.bot.closeWindow(this.bot.currentWindow);
-        await new Promise(resolve => setTimeout(resolve, 500)); // 等待窗口关闭
-      }
-
-      // 🔧 暂停方块扫描，避免 bot.craft() 打开工作台时事件循环被占用
-      // 尝试从多个可能的位置获取 cacheManager
-      let cacheManager: any = null;
-      if ((this.bot as any).cacheManager) {
-        cacheManager = (this.bot as any).cacheManager;
-      } else if ((this.bot as any).gameState?.cacheManager) {
-        cacheManager = (this.bot as any).gameState.cacheManager;
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
 
       let scanningPaused = false;
-      if (cacheManager && typeof cacheManager.pauseScanning === 'function') {
-        cacheManager.pauseScanning();
+      if (this.cacheManager && typeof this.cacheManager.pauseScanning === 'function') {
+        this.cacheManager.pauseScanning();
         scanningPaused = true;
         logger.debug('⏸️ 已暂停方块扫描（合成期间）');
       }
@@ -692,9 +689,8 @@ export class CraftManager {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await this.bot.craft(recipe as any, count, craftingTable);
       } finally {
-        // 确保恢复扫描
-        if (scanningPaused && cacheManager && typeof cacheManager.resumeScanning === 'function') {
-          cacheManager.resumeScanning();
+        if (scanningPaused && this.cacheManager && typeof this.cacheManager.resumeScanning === 'function') {
+          this.cacheManager.resumeScanning();
           logger.debug('▶️ 已恢复方块扫描');
         }
       }

@@ -199,50 +199,49 @@ if (bot) {
   cacheManager.stop();
 }
 
-// ===== 在 GameState 中使用缓存 =====
+// ===== 在 RuntimeContext 中使用缓存 =====
 
-// 在实际使用中，缓存系统已经集成到 GameState 中
-// 可以通过以下方式使用：
+// 在实际使用中，缓存系统已集成到 RuntimeContext 中
+// 可以通过以下方式使用（在 Action 的 execute 方法中）：
 
 // 获取方块缓存
-// const gameState = getGameState(); // 获取 GameState 实例
-// const blockInfo = gameState.getBlockInfo(100, 64, 200);
+// const blockInfo = context.blockCache.getBlock(100, 64, 200);
 
 // 设置方块缓存
-// gameState.setBlockInfo(100, 64, 200, {
+// context.blockCache.setBlock(100, 64, 200, {
 //   name: 'oak_log',
 //   type: 17,
 //   hardness: 2
 // });
 
 // 获取附近方块
-// const nearbyBlocks = gameState.getNearbyBlocks(16);
+// const nearbyBlocks = context.blockCache.getBlocksInRadius(x, y, z, 16);
 
 // 按名称查找方块
-// const diamonds = gameState.findBlocksByName('diamond_ore');
+// const diamonds = context.blockCache.findBlocksByName('diamond_ore');
 
 // 获取容器缓存
-// const container = gameState.getContainerInfo(100, 64, 200, 'chest');
+// const container = context.containerCache.getContainer(100, 64, 200, 'chest');
 
 // 设置容器缓存
-// gameState.setContainerInfo(100, 64, 200, 'chest', {
+// context.containerCache.setContainer(100, 64, 200, 'chest', {
 //   type: 'chest',
 //   items: [...],
 //   size: 27
 // });
 
 // 获取附近容器
-// const nearbyContainers = gameState.getNearbyContainers(32);
+// const nearbyContainers = context.containerCache.getContainersInRadius(x, y, z, 32);
 
 // 按物品查找容器
-// const chestsWithDiamonds = gameState.findContainersWithItem(264, 5);
+// const chestsWithDiamonds = context.containerCache.findContainersWithItem(264, 5);
 
 // 手动触发缓存扫描
-// await gameState.triggerCacheScan(16);
+// await context.cacheManager.triggerBlockScan(16);
 
 // 获取缓存统计信息
-// const cacheStats = gameState.getCacheStats();
-// const managerStats = gameState.getCacheManagerStats();
+// const blockStats = context.blockCache.getStats();
+// const managerStats = context.cacheManager.getStats();
 
 console.log('缓存系统示例演示完成');
 */

@@ -9,6 +9,8 @@ import { MovementUtils } from '@/utils/MovementUtils';
 import { CraftManager } from '@/core/crafting/CraftManager';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
+import { CacheManager } from '@/core/cache/CacheManager';
+import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import type { LLMManager } from '@/llm/LLMManager';
 import type { GoalManager } from '@/core/agent/planning/goal/GoalManager';
 
@@ -51,6 +53,8 @@ export interface RuntimeContext {
   blockCache: BlockCache;
   containerCache: ContainerCache;
   locationManager: LocationManager;
+  cacheManager: CacheManager;
+  nearbyBlockManager: NearbyBlockManager;
 
   events: EventManager;
 

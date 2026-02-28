@@ -4,6 +4,8 @@ import type { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
 import { LocationManager } from '@/core/cache/LocationManager';
+import { CacheManager } from '@/core/cache/CacheManager';
+import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import { EventManager } from '@/core/events/EventManager';
 import { GameState } from '@/core/state/GameState';
 import type { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
@@ -19,6 +21,8 @@ export interface ContextManagerParams {
   blockCache: BlockCache;
   containerCache: ContainerCache;
   locationManager: LocationManager;
+  cacheManager: CacheManager;
+  nearbyBlockManager: NearbyBlockManager;
   signal: AbortSignal;
   placeBlockUtils: PlaceBlockUtils;
   movementUtils: MovementUtils;
@@ -40,6 +44,8 @@ export class ContextManager {
       blockCache: params.blockCache,
       containerCache: params.containerCache,
       locationManager: params.locationManager,
+      cacheManager: params.cacheManager,
+      nearbyBlockManager: params.nearbyBlockManager,
       events,
       signal: params.signal,
       logger: params.logger,

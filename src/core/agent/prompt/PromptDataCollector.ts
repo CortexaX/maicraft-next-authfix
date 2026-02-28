@@ -283,10 +283,8 @@ export class PromptDataCollector {
 
   private getNearbyBlocksInfo(): string {
     try {
-      const { gameState, bot } = this.state.context;
+      const { gameState, bot, nearbyBlockManager, blockCache } = this.state.context;
 
-      // 使用实时的玩家位置，而不是可能过时的gameState.blockPosition
-      // gameState.blockPosition只在玩家移动时更新，静止时是过时的
       let currentPosition;
       if (bot?.entity?.position) {
         currentPosition = bot.entity.position.floored();
@@ -298,8 +296,6 @@ export class PromptDataCollector {
         return '位置信息不可用';
       }
 
-      // 使用 NearbyBlockManager 获取格式化的方块信息
-      const nearbyBlockManager = gameState.getNearbyBlockManager?.();
       if (nearbyBlockManager) {
         const blockInfo = nearbyBlockManager.getVisibleBlocksInfo(
           {
@@ -314,38 +310,39 @@ export class PromptDataCollector {
         return blockInfo;
       }
 
-      // 降级方案：使用旧的方式
-      const nearbyBlocks = gameState.getNearbyBlocks?.(16) || [];
+      const nearbyBlocks = blockCache.getBlocksInRadius(currentPosition.x, currentPosition.y, currentPosition.z, 16);
       this.logger.debug(`🔍 获取周围方块: 找到 ${nearbyBlocks.length} 个方块`);
 
       if (nearbyBlocks.length === 0) {
         return '附近没有方块信息';
       }
 
-      // 不再过滤方块，显示所有方块（除了普通空气）
       const validBlocks = nearbyBlocks.filter(block => block.name !== 'air');
 
       if (validBlocks.length === 0) {
         return '附近都是空气方块';
       }
 
-      // 按距离排序
-      const botPosition = gameState.blockPosition;
       validBlocks.sort((a, b) => {
         const distA = Math.sqrt(
-          Math.pow(a.position.x - botPosition.x, 2) + Math.pow(a.position.y - botPosition.y, 2) + Math.pow(a.position.z - botPosition.z, 2),
+          Math.pow(a.position.x - currentPosition.x, 2) +
+            Math.pow(a.position.y - currentPosition.y, 2) +
+            Math.pow(a.position.z - currentPosition.z, 2),
         );
         const distB = Math.sqrt(
-          Math.pow(b.position.x - botPosition.x, 2) + Math.pow(b.position.y - botPosition.y, 2) + Math.pow(b.position.z - botPosition.z, 2),
+          Math.pow(b.position.x - currentPosition.x, 2) +
+            Math.pow(b.position.y - currentPosition.y, 2) +
+            Math.pow(b.position.z - currentPosition.z, 2),
         );
         return distA - distB;
       });
 
-      // 按类型分组显示
       const groupedBlocks = new Map<string, Array<{ position: any; distance: number }>>();
       for (const block of validBlocks) {
         const pos = block.position;
-        const distance = Math.sqrt(Math.pow(pos.x - botPosition.x, 2) + Math.pow(pos.y - botPosition.y, 2) + Math.pow(pos.z - botPosition.z, 2));
+        const distance = Math.sqrt(
+          Math.pow(pos.x - currentPosition.x, 2) + Math.pow(pos.y - currentPosition.y, 2) + Math.pow(pos.z - currentPosition.z, 2),
+        );
 
         if (!groupedBlocks.has(block.name)) {
           groupedBlocks.set(block.name, []);
@@ -353,11 +350,10 @@ export class PromptDataCollector {
         groupedBlocks.get(block.name)!.push({ position: pos, distance });
       }
 
-      // 生成详细信息
       const blockLines: string[] = [];
       for (const [blockName, positions] of groupedBlocks) {
         const count = positions.length;
-        const nearest = positions[0]; // 已排序，第一个是最近的
+        const nearest = positions[0];
         blockLines.push(
           `  ${blockName} (${count}个) 最近: (${nearest.position.x}, ${nearest.position.y}, ${nearest.position.z}) [${nearest.distance.toFixed(1)}格]`,
         );
@@ -372,16 +368,20 @@ export class PromptDataCollector {
 
   private getContainerCacheInfo(): string {
     try {
-      const { gameState } = this.state.context;
-      const nearbyContainers = gameState.getNearbyContainers?.(32) || [];
+      const { gameState, containerCache } = this.state.context;
+      const nearbyContainers = containerCache.getContainersInRadius(
+        gameState.blockPosition.x,
+        gameState.blockPosition.y,
+        gameState.blockPosition.z,
+        32,
+      );
 
-      // 调试日志
       this.logger.debug(`📦 获取容器信息: 找到 ${nearbyContainers.length} 个容器`);
       if (nearbyContainers.length > 0) {
         this.logger.debug(
           `📦 容器列表: ${nearbyContainers
             .slice(0, 3)
-            .map(c => c.type)
+            .map((c: any) => c.type)
             .join(', ')}${nearbyContainers.length > 3 ? '...' : ''}`,
         );
       }
@@ -390,8 +390,7 @@ export class PromptDataCollector {
         return '附近没有已知的容器';
       }
 
-      // 按距离排序容器
-      nearbyContainers.sort((a, b) => {
+      nearbyContainers.sort((a: any, b: any) => {
         const distA = a.position.distanceTo(gameState.blockPosition);
         const distB = b.position.distanceTo(gameState.blockPosition);
         return distA - distB;
@@ -400,7 +399,6 @@ export class PromptDataCollector {
       const containerLines: string[] = [];
 
       for (const container of nearbyContainers.slice(0, 8)) {
-        // 最多显示8个容器
         const pos = container.position;
         const distance = pos.distanceTo(gameState.blockPosition);
 
@@ -409,9 +407,6 @@ export class PromptDataCollector {
         line += ` [距离: ${distance.toFixed(1)}格]`;
 
         containerLines.push(line);
-
-        // 🔧 不再显示物品信息，减少提示词长度和查询开销
-        // 如需查询容器内容，请使用 use_chest/use_furnace 动作实时查询
       }
 
       return `附近容器 (${nearbyContainers.length}个):\n${containerLines.join('\n')}`;

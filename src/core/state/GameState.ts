@@ -2,11 +2,7 @@ import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { Item } from 'prismarine-item';
 import { getLogger, type Logger } from '@/utils/Logger';
-import { BlockCache } from '@/core/cache/BlockCache';
-import { ContainerCache } from '@/core/cache/ContainerCache';
-import { CacheManager } from '@/core/cache/CacheManager';
-import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
-import type { BlockInfo, ContainerInfo } from '@/core/cache/types';
+import { EventManager, type ListenerHandle } from '@/core/events/EventManager';
 
 export interface ItemInfo {
   name: string;
@@ -69,41 +65,26 @@ export class GameState {
 
   isSleeping: boolean = false;
 
-  readonly blockCache: BlockCache;
-  readonly containerCache: ContainerCache;
-  readonly cacheManager: CacheManager;
-  readonly nearbyBlockManager: NearbyBlockManager;
-
   private initialized: boolean = false;
-
+  private bot: Bot | null = null;
+  private eventHandles: ListenerHandle[] = [];
   private entityUpdateInterval?: NodeJS.Timeout;
 
-  constructor(params: {
-    blockCache: BlockCache;
-    containerCache: ContainerCache;
-    cacheManager: CacheManager;
-    nearbyBlockManager: NearbyBlockManager;
-  }) {
+  constructor() {
     this.logger = getLogger('GameState');
-    this.blockCache = params.blockCache;
-    this.containerCache = params.containerCache;
-    this.cacheManager = params.cacheManager;
-    this.nearbyBlockManager = params.nearbyBlockManager;
   }
 
   /**
-   * 初始化游戏状态，设置 bot 事件监听
+   * 初始化游戏状态，设置事件监听（通过 EventManager）
    */
-  initialize(bot: Bot): void {
+  initialize(bot: Bot, events: EventManager): void {
     if (this.initialized) {
       this.logger.warn('已经初始化，跳过');
       return;
     }
 
-    // 设置玩家名称
+    this.bot = bot;
     this.playerName = bot.username;
-
-    this.startCacheSystem();
 
     this.updatePosition(bot);
     this.updateHealth(bot);
@@ -117,50 +98,64 @@ export class GameState {
       items: initialItems.map(i => `${i.name}x${i.count}`).join(', ') || '无',
     });
 
-    bot.on('health', () => {
-      this.updateHealth(bot);
-      this.updateFood(bot);
-    });
+    // 通过 EventManager 订阅事件，避免双重监听
+    // 注意：EventManager 的回调参数是 data 对象，但部分属性需要从 bot 读取
+    this.eventHandles.push(
+      events.on('health', () => {
+        this.updateHealth(bot);
+        this.updateFood(bot);
+      }),
+    );
 
-    bot.on('move', () => {
-      this.updatePosition(bot);
-    });
+    this.eventHandles.push(
+      events.on('move', () => {
+        this.updatePosition(bot);
+      }),
+    );
 
-    bot.on('experience', () => {
-      this.updateExperience(bot);
-    });
+    this.eventHandles.push(
+      events.on('experience', () => {
+        this.updateExperience(bot);
+      }),
+    );
 
-    // windowUpdate 和 weather 是 mineflayer 的运行时事件，类型定义中不存在
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (bot as any).on?.('windowUpdate', () => {
-      this.updateInventory(bot);
-    });
+    this.eventHandles.push(
+      events.on('windowUpdate', () => {
+        this.updateInventory(bot);
+      }),
+    );
 
-    bot.on('playerCollect', () => {
-      this.updateInventory(bot);
-    });
+    this.eventHandles.push(
+      events.on('playerCollect', () => {
+        this.updateInventory(bot);
+      }),
+    );
 
-    bot.on('itemDrop', () => {
-      this.updateInventory(bot);
-    });
+    this.eventHandles.push(
+      events.on('time', data => {
+        this.timeOfDay = data.timeOfDay;
+      }),
+    );
 
-    bot.on('time', () => {
-      this.timeOfDay = bot.time.timeOfDay;
-    });
+    this.eventHandles.push(
+      events.on('weather', () => {
+        this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
+      }),
+    );
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (bot as any).on?.('weather', () => {
-      this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
-    });
+    this.eventHandles.push(
+      events.on('sleep', () => {
+        this.isSleeping = true;
+      }),
+    );
 
-    bot.on('sleep', () => {
-      this.isSleeping = true;
-    });
+    this.eventHandles.push(
+      events.on('wake', () => {
+        this.isSleeping = false;
+      }),
+    );
 
-    bot.on('wake', () => {
-      this.isSleeping = false;
-    });
-
+    // 定时更新周围实体（仍需直接访问 bot）
     this.entityUpdateInterval = setInterval(() => {
       this.updateNearbyEntities(bot);
     }, 1000);
@@ -169,52 +164,16 @@ export class GameState {
     this.logger.info('初始化完成');
   }
 
-  private startCacheSystem(): void {
-    this.logger.info('启动缓存系统', {
-      hasCacheManager: !!this.cacheManager,
-      hasNearbyBlockManager: !!this.nearbyBlockManager,
-    });
-
-    this.loadCaches()
-      .then(() => {
-        this.logger.info('缓存数据加载完成', {
-          blockCacheSize: this.blockCache.size(),
-          containerCacheSize: this.containerCache.size(),
-        });
-
-        this.cacheManager.start();
-        this.logger.info('缓存管理器已启动');
-
-        this.cacheManager
-          .triggerBlockScan()
-          .then(() => {
-            this.logger.info('初始方块扫描完成');
-          })
-          .catch(err => {
-            this.logger.error('初始方块扫描失败', undefined, err);
-          });
-      })
-      .catch(error => {
-        this.logger.error('加载缓存数据失败', undefined, error);
-      });
-
-    this.logger.info('缓存系统启动完成');
-  }
-
-  private async loadCaches(): Promise<void> {
-    await this.blockCache.load();
-    await this.containerCache.load();
-  }
-
   cleanup(): void {
+    for (const handle of this.eventHandles) {
+      handle.remove();
+    }
+    this.eventHandles = [];
+
     if (this.entityUpdateInterval) {
       clearInterval(this.entityUpdateInterval);
       this.entityUpdateInterval = undefined;
     }
-
-    this.cacheManager.destroy();
-    this.blockCache.destroy();
-    this.containerCache.destroy();
 
     this.initialized = false;
   }
@@ -405,136 +364,5 @@ export class GameState {
     const lines = this.nearbyEntities.map((e, i) => `  ${i + 1}. ${e.name} (距离: ${e.distance?.toFixed(1)}格)`);
 
     return `周围${this.entitySearchDistance}格内实体 (${this.nearbyEntities.length}):\n${lines.join('\n')}`;
-  }
-
-  getBlockInfo(x: number, y: number, z: number): BlockInfo | null {
-    return this.blockCache.getBlock(x, y, z);
-  }
-
-  setBlockInfo(x: number, y: number, z: number, blockInfo: Partial<BlockInfo>): void {
-    this.blockCache.setBlock(x, y, z, blockInfo);
-  }
-
-  getNearbyBlocks(radius: number = 16): BlockInfo[] {
-    return this.blockCache.getBlocksInRadius(this.blockPosition.x, this.blockPosition.y, this.blockPosition.z, radius);
-  }
-
-  getNearbyBlockManager(): NearbyBlockManager {
-    return this.nearbyBlockManager;
-  }
-
-  findBlocksByName(name: string): BlockInfo[] {
-    return this.blockCache.findBlocksByName(name);
-  }
-
-  getContainerInfo(x: number, y: number, z: number, type?: string): ContainerInfo | null {
-    return this.containerCache.getContainer(x, y, z, type);
-  }
-
-  setContainerInfo(x: number, y: number, z: number, type: string, containerInfo: Partial<ContainerInfo>): void {
-    this.containerCache.setContainer(x, y, z, type, containerInfo);
-  }
-
-  getNearbyContainers(radius: number = 16): ContainerInfo[] {
-    return this.containerCache.getContainersInRadius(this.blockPosition.x, this.blockPosition.y, this.blockPosition.z, radius);
-  }
-
-  findContainersWithItem(itemId: number, minCount: number = 1): ContainerInfo[] {
-    return this.containerCache.findContainersWithItem(itemId, minCount);
-  }
-
-  findContainersWithItemName(itemName: string, minCount: number = 1): ContainerInfo[] {
-    return this.containerCache.findContainersWithItemName(itemName, minCount);
-  }
-
-  async saveCaches(): Promise<void> {
-    await this.blockCache.save();
-    await this.containerCache.save();
-  }
-
-  getCacheStats(): { blockCache?: any; containerCache?: any } {
-    return {
-      blockCache: this.blockCache.getStats(),
-      containerCache: this.containerCache.getStats(),
-    };
-  }
-
-  scanNearbyBlocks(bot: Bot, radius: number = 8): void {
-    if (!bot.blockAt) return;
-
-    try {
-      const blocks: Array<{ x: number; y: number; z: number; block: Partial<BlockInfo> }> = [];
-
-      for (let x = -radius; x <= radius; x++) {
-        for (let y = -radius; y <= radius; y++) {
-          for (let z = -radius; z <= radius; z++) {
-            const worldX = Math.floor(this.blockPosition.x + x);
-            const worldY = Math.floor(this.blockPosition.y + y);
-            const worldZ = Math.floor(this.blockPosition.z + z);
-
-            const block = bot.blockAt(new Vec3(worldX, worldY, worldZ));
-            if (block) {
-              // 缓存所有方块，包括空气方块
-              // 这对环境感知非常重要（如检测水、岩浆等）
-              blocks.push({
-                x: worldX,
-                y: worldY,
-                z: worldZ,
-                block: {
-                  name: block.name,
-                  type: block.type,
-                  metadata: block.metadata,
-                  hardness: block.hardness,
-                  lightLevel: block.lightLevel,
-                  transparent: block.transparent,
-                },
-              });
-            }
-          }
-        }
-      }
-
-      this.blockCache.setBlocks(blocks);
-      this.logger.debug(`扫描并缓存了 ${blocks.length} 个方块 (半径: ${radius})，包含所有方块类型`);
-    } catch (error) {
-      this.logger.error('扫描周围方块失败', undefined, error as Error);
-    }
-  }
-
-  async triggerCacheScan(radius?: number): Promise<void> {
-    await this.cacheManager.triggerBlockScan(radius);
-  }
-
-  async triggerContainerUpdate(): Promise<void> {
-    await this.cacheManager.triggerContainerUpdate();
-  }
-
-  getCacheManagerStats(): any {
-    return this.cacheManager.getStats();
-  }
-
-  setCacheAutoManagement(enabled: boolean): void {
-    if (enabled) {
-      this.cacheManager.start();
-    } else {
-      this.cacheManager.stop();
-    }
-  }
-
-  setCachePerformanceMode(mode: 'balanced' | 'performance' | 'memory'): void {
-    this.logger.info(`设置缓存性能模式: ${mode}`);
-
-    switch (mode) {
-      case 'performance':
-        this.logger.info('缓存已切换到性能优先模式');
-        break;
-      case 'memory':
-        this.logger.info('缓存已切换到内存优化模式');
-        break;
-      case 'balanced':
-      default:
-        this.logger.info('缓存已切换到平衡模式');
-        break;
-    }
   }
 }
