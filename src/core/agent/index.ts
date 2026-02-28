@@ -24,11 +24,9 @@ export type {
   MemoryStats,
 } from './memory/types';
 
-// Planning - Goal & Task
+// Planning - Goal
 export type { Goal, GoalStatus, GoalCompletedBy, CreateGoalParams, UpdateGoalParams } from './planning/goal/Goal';
-export type { Task, TaskStatus, TaskCompletedBy, CreateTaskParams, UpdateTaskParams } from './planning/task/Task';
 export { GoalManager } from './planning/goal/GoalManager';
-export { TaskManager } from './planning/task/TaskManager';
 
 // Trackers
 export type {
