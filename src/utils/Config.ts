@@ -1,9 +1,9 @@
-import { existsSync, copyFileSync, readFileSync, writeFileSync, watchFile, unwatchFile, statSync } from 'fs';
+import { existsSync, copyFileSync, readFileSync, writeFileSync, watchFile, unwatchFile } from 'fs';
 import { join, dirname, basename } from 'path';
 import { parse as parseToml, stringify as stringifyToml } from 'smol-toml';
 import { z } from 'zod';
 import { EventEmitter } from 'events';
-import { getLogger, LogLevel } from './Logger';
+import { getLogger } from './Logger';
 import { LLMConfigSchema } from '@/llm/types';
 
 /**
@@ -134,6 +134,20 @@ export interface MaibotSection {
 }
 
 /**
+ * 缓存配置接口
+ */
+export interface CacheSection {
+  // 方块缓存配置
+  only_visible_blocks: boolean;
+  enable_periodic_scan: boolean;
+  enable_auto_save: boolean;
+  max_block_entries: number;
+  max_container_entries: number;
+  block_expiration_time: number;
+  container_expiration_time: number;
+}
+
+/**
  * 深度可选类型
  */
 export type DeepPartial<T> = {
@@ -151,6 +165,7 @@ export interface AppConfig {
   llm: import('../llm/types.js').LLMConfig;
   plugins: PluginsSection;
   maibot: MaibotSection;
+  cache: CacheSection;
   advanced: AdvancedSection;
 }
 
@@ -273,13 +288,21 @@ const MaibotSectionSchema = z.object({
   send_decision_memory: z.boolean().default(true),
   decision_memory_batch_size: z.number().positive().default(5),
   memory_send_interval: z.number().positive().default(1000),
-  // 群组信息配置
   group_id: z.string().optional(),
   group_name: z.string().optional(),
-  // 用户信息配置
   user_id: z.string().optional(),
   user_name: z.string().optional(),
   user_displayname: z.string().optional(),
+});
+
+const CacheSectionSchema = z.object({
+  only_visible_blocks: z.boolean().default(true),
+  enable_periodic_scan: z.boolean().default(false),
+  enable_auto_save: z.boolean().default(false),
+  max_block_entries: z.number().min(0).default(0),
+  max_container_entries: z.number().min(0).default(0),
+  block_expiration_time: z.number().min(0).default(0),
+  container_expiration_time: z.number().min(0).default(0),
 });
 
 const AppConfigSchema = z.object({
@@ -290,6 +313,7 @@ const AppConfigSchema = z.object({
   llm: LLMConfigSchema,
   plugins: PluginsSectionSchema,
   maibot: MaibotSectionSchema,
+  cache: CacheSectionSchema,
   advanced: AdvancedSectionSchema,
 });
 
@@ -484,6 +508,7 @@ export class ConfigManager extends EventEmitter {
       minecraft: {},
       agent: {},
       plugins: {},
+      cache: {},
       advanced: {},
     });
   }
