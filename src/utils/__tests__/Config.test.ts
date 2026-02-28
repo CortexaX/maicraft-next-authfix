@@ -1,7 +1,7 @@
 import { existsSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { ConfigManager, ConfigError, initializeConfig, getConfig, getSection, updateConfig, DeepPartial } from '@/utils/Config';
-import { createConfiguredLogger } from '@/utils/Logger';
+import { getLogger } from '@/utils/Logger';
 import { AppConfig } from '@/utils/Config';
 
 // 测试用的配置文件路径
@@ -459,19 +459,15 @@ describe('Logger Integration', () => {
   test('应该能够从配置创建日志器', async () => {
     await initializeConfig(TEST_CONFIG_PATH, TEST_TEMPLATE_PATH);
 
-    const logger = createConfiguredLogger('TestModule');
+    const logger = getLogger('TestModule');
 
     expect(logger).toBeDefined();
-    // 日志器应该根据配置文件创建
-    // 这里可以检查日志器的配置是否正确
   });
 
   test('配置不可用时应该使用默认配置', () => {
-    // 删除配置文件，测试默认配置
-    const logger = createConfiguredLogger('TestModule');
+    const logger = getLogger('TestModule');
 
     expect(logger).toBeDefined();
-    // 应该使用默认的日志配置
   });
 });
 
@@ -488,7 +484,7 @@ describe('集成测试', () => {
       const config = await configManager.loadConfig();
 
       // 创建日志器
-      const logger = createConfiguredLogger('IntegrationTest');
+      const logger = getLogger('IntegrationTest');
 
       // 测试日志功能
       logger.info('集成测试日志消息', { config: config.app.name });

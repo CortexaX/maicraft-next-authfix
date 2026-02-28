@@ -1,6 +1,8 @@
 import type { Bot } from 'mineflayer';
 import type { AppConfig } from '@/utils/Config';
 import type { Logger } from '@/utils/Logger';
+import { GlobalLoggerManager } from '@/utils/Logger';
+import { getConfigManager } from '@/utils/Config';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
 import { LocationManager } from '@/core/cache/LocationManager';
@@ -15,7 +17,6 @@ import { MaiBotClient } from '@/core/agent/communication/MaiBotClient';
 import { MemoryManager } from '@/core/agent/memory/MemoryManager';
 import { GoalManager } from '@/core/agent/planning/goal/GoalManager';
 import { TrackerFactory } from '@/core/agent/planning/trackers/TrackerFactory';
-import { LoggerFactory } from '@/utils/Logger';
 import { ConfigLoader } from '@/utils/Config';
 import { PromptManager } from '@/core/agent/prompt/prompt_manager';
 import { createPromptOverrideManager } from '@/core/agent/communication/promptOverrideManager';
@@ -73,7 +74,6 @@ export interface AppServices {
   memoryManager: MemoryManager;
   interruptManager: InterruptManager;
   trackerFactory: TrackerFactory;
-  loggerFactory: LoggerFactory;
   configLoader: ConfigLoader;
   promptManager: PromptManager;
   promptOverrideManager: ReturnType<typeof createPromptOverrideManager>;
@@ -157,7 +157,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 
   const interruptManager = new InterruptManager(gameState, actionExecutor.getEventManager());
   const trackerFactory = new TrackerFactory(actionExecutor.getEventManager());
-  const loggerFactory = new LoggerFactory();
   const configLoader = new ConfigLoader();
   const promptManager = new PromptManager();
   const promptOverrideManager = createPromptOverrideManager(getDefaultOverrideTemplates());
@@ -185,7 +184,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     memoryManager,
     interruptManager,
     trackerFactory,
-    loggerFactory,
     configLoader,
     promptManager,
     promptOverrideManager,
@@ -199,14 +197,20 @@ export async function initializeServices(services: AppServices, bot: Bot, logger
 
   const events = services.actionExecutor.getEventManager();
   events.on('actionComplete', (data: any) => {
-    console.debug(`动作完成: ${data.actionName}`, {
+    logger.debug(`动作完成: ${data.actionName}`, {
       duration: data.duration,
       result: data.result.message,
     });
   });
 
   events.on('actionError', (data: any) => {
-    console.error(`动作错误: ${data.actionName}`, data.error);
+    logger.error(`动作错误: ${data.actionName}`, data.error);
+  });
+
+  const configManager = getConfigManager();
+  configManager.on('configChanged', () => {
+    GlobalLoggerManager.getInstance().updateAllConfigs();
+    logger.info('配置已更新，日志级别已同步');
   });
 
   logger.info('✅ LLM管理器初始化完成', {

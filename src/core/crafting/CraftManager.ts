@@ -11,6 +11,7 @@
 import { Bot } from 'mineflayer';
 import { normalizeItemName } from '@/utils/ItemNameMapping';
 import { ActionResult, CraftOptions, MaterialOptions, MaterialRequirement, CRAFT_ERRORS, CraftErrorCode } from '@/core/actions/types';
+import { getLogger } from '@/utils/Logger';
 
 interface Recipe {
   result: RecipeItem;
@@ -46,9 +47,11 @@ interface Logger {
 export class CraftManager {
   private bot: Bot;
   private mcData: any;
+  private logger: Logger;
 
   constructor(bot: Bot) {
     this.bot = bot;
+    this.logger = getLogger('CraftManager');
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.mcData = require('minecraft-data')(bot.version);
   }
@@ -250,7 +253,7 @@ export class CraftManager {
         }
       }
     } catch (error) {
-      console.warn('分析配方材料时出错:', error);
+      this.logger.warn('分析配方材料时出错:', error);
     }
 
     return materials;
@@ -369,8 +372,7 @@ export class CraftManager {
         ingredients.push(...Array.from(ingredientCount.entries()).map(([id, count]) => ({ id, count })));
       }
     } catch (error) {
-      // 如果解析失败，返回空数组避免崩溃
-      console.warn('解析配方材料时出错:', error);
+      this.logger.warn('解析配方材料时出错:', error);
       return [];
     }
 
@@ -461,14 +463,14 @@ export class CraftManager {
     const ingredients = this.getIngredientsFromRecipe(recipe);
 
     // 调试：输出解析出的材料信息
-    console.log(`[DEBUG] 解析出的配方材料: ${JSON.stringify(ingredients, null, 2)}`);
+    this.logger.debug(`解析出的配方材料: ${JSON.stringify(ingredients, null, 2)}`);
 
     for (const ingredient of ingredients) {
       const materialName = this.getItemNameById(ingredient.id);
       const needCount = ingredient.count * count;
       const haveCount = this.getItemCount(ingredient.id);
 
-      console.log(`[DEBUG] 材料检查: ${materialName} (ID: ${ingredient.id}) - 需要: ${needCount}, 拥有: ${haveCount}`);
+      this.logger.debug(`材料检查: ${materialName} (ID: ${ingredient.id}) - 需要: ${needCount}, 拥有: ${haveCount}`);
 
       if (haveCount < needCount) {
         missingMaterials.push({

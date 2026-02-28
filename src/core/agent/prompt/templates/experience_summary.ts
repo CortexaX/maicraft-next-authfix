@@ -3,12 +3,15 @@
  */
 
 import { PromptTemplate, promptManager } from '@/core/agent/prompt/prompt_manager';
+import { getLogger } from '@/utils/Logger';
+
+const logger = getLogger('ExperienceSummaryTemplate');
 
 /**
  * 初始化经验总结模板
  */
 export function initExperienceSummaryTemplate(): void {
-  console.log('📝 注册经验总结模板...');
+  logger.info('注册经验总结模板...');
 
   promptManager.registerTemplate(
     new PromptTemplate(
@@ -109,5 +112,5 @@ export function initExperienceSummaryTemplate(): void {
     ),
   );
 
-  console.log('✅ 经验总结模板注册完成');
+  logger.info('经验总结模板注册完成');
 }

@@ -2,6 +2,10 @@
  * 模板统一导出和初始化
  */
 
+import { getLogger } from '@/utils/Logger';
+
+const logger = getLogger('TemplateIndex');
+
 // 导出所有模板初始化函数
 export { initBasicInfoTemplate } from './basic_info';
 export { initMainThinkingTemplate } from './main_thinking';
@@ -65,7 +69,7 @@ export function initAllCoreTemplates(): void {
     initFurnaceOperationTemplate();
     initChestOperationTemplate();
   } catch (error) {
-    console.error('模板初始化失败:', error);
+    logger.error('模板初始化失败', { error: error instanceof Error ? error.message : String(error) });
     throw error;
   }
 }

@@ -11,20 +11,16 @@ import * as path from 'path';
 import { createServices, initializeServices, disposeServices, type AppServices } from '@/core/di';
 
 import { type AppConfig } from '@/utils/Config';
-import { createLogger, LogLevel, type Logger } from '@/utils/Logger';
+import { getLogger, type Logger } from '@/utils/Logger';
 import { ConfigLoader } from '@/utils/Config';
 
-const basicErrorLogger: Logger = createLogger({
-  level: LogLevel.INFO,
-  console: true,
-  file: false,
-});
+const basicErrorLogger: Logger = getLogger('BasicError');
 
 class MaicraftNext {
   private services?: AppServices;
   private bot?: Bot;
   private config?: AppConfig;
-  private logger: Logger = createLogger();
+  private logger: Logger = getLogger('MaicraftApp');
 
   private isShuttingDown = false;
   private reconnectTimer?: NodeJS.Timeout;

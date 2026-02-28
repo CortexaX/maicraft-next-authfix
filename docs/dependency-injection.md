@@ -36,7 +36,6 @@ export interface AppServices {
   memoryManager: MemoryManager;
   interruptController: InterruptController;
   trackerFactory: TrackerFactory;
-  loggerFactory: LoggerFactory;
   configLoader: ConfigLoader;
   promptManager: PromptManager;
   promptOverrideManager: ReturnType<typeof createPromptOverrideManager>;

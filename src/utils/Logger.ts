@@ -361,7 +361,6 @@ export class Logger {
    */
   private writeToConsole(entry: LogEntry): void {
     const levelName = LOG_LEVEL_NAMES[entry.level];
-    const moduleInfo = entry.context?.module ? `[${entry.context.module}] ` : '';
 
     // 创建context副本，移除module字段（因为已经在模块前缀中显示了）
     const contextForDisplay = entry.context ? { ...entry.context } : undefined;
@@ -603,40 +602,13 @@ export const logger = GlobalLoggerManager.getInstance().getRootLogger();
  * 获取模块日志器的便捷函数
  */
 export function getLogger(moduleName: string): Logger {
+  if (!moduleName || moduleName.trim() === '') {
+    throw new Error('模块名称不能为空');
+  }
+
+  if (!/^[a-zA-Z0-9_-]+$/.test(moduleName)) {
+    throw new Error(`模块名称 "${moduleName}" 包含无效字符。只允许字母、数字、连字符和下划线。`);
+  }
+
   return GlobalLoggerManager.getInstance().getLogger(moduleName);
 }
-
-/**
- * 创建日志器的便捷函数
- */
-export function createLogger(config?: Partial<LoggerConfig>): Logger {
-  return new Logger(config);
-}
-
-/**
- * 创建模块专用日志器的便捷函数
- */
-export function createModuleLogger(moduleName: string, config?: Partial<LoggerConfig>): Logger {
-  const logger = new Logger(config);
-  const originalLog = logger.log.bind(logger);
-  logger.log = (level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error) => {
-    originalLog(level, message, { ...context, module: moduleName }, error);
-  };
-  return logger;
-}
-
-/**
- * 创建配置化的日志器（兼容ConfiguredLogger）
- * 这个函数会自动从配置文件读取日志配置
- */
-export function createConfiguredLogger(moduleName: string, config?: Partial<LoggerConfig>): Logger {
-  const logger = new Logger(config);
-  const originalLog = logger.log.bind(logger);
-  logger.log = (level: LogLevel, message: string, context?: Record<string, unknown>, error?: Error) => {
-    originalLog(level, message, { ...context, module: moduleName }, error);
-  };
-  return logger;
-}
-
-// 导出 LoggerFactory
-export { LoggerFactory, loggerFactory } from './LoggerFactory';

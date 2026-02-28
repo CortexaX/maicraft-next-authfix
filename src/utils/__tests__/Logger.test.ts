@@ -1,4 +1,4 @@
-import { Logger, LogLevel, createLogger, createModuleLogger, logger } from '@/utils/Logger';
+import { Logger, LogLevel, getLogger, logger } from '@/utils/Logger';
 import { existsSync, readFileSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { rimraf } from 'rimraf';
@@ -179,12 +179,7 @@ describe('Logger', () => {
     });
 
     test('应该支持便捷函数创建模块日志器', () => {
-      const moduleLogger = createModuleLogger('auth-service', {
-        level: LogLevel.INFO,
-        console: false,
-        file: true,
-        logDir: testLogDir,
-      });
+      const moduleLogger = getLogger('auth-service');
 
       moduleLogger.warn('认证失败', { userId: 456 });
 
@@ -275,22 +270,28 @@ describe('Logger', () => {
   });
 
   describe('便捷函数', () => {
-    test('createLogger应该创建配置好的日志器', () => {
-      const customLogger = createLogger({
-        level: LogLevel.DEBUG,
-        console: false,
-        file: true,
-        logDir: testLogDir,
-      });
+    test('getLogger应该创建模块日志器', () => {
+      const customLogger = getLogger('CustomModule');
 
-      customLogger.debug('调试消息');
+      customLogger.info('测试消息');
 
-      const logFiles = readdirSync(testLogDir);
-      expect(logFiles.length).toBe(1);
+      expect(customLogger).toBeInstanceOf(Logger);
+    });
 
-      const logContent = readFileSync(join(testLogDir, logFiles[0]), 'utf8');
-      const logEntry = JSON.parse(logContent.trim());
-      expect(logEntry.level).toBe(LogLevel.DEBUG);
+    test('getLogger应该拒绝空模块名', () => {
+      expect(() => {
+        getLogger('');
+      }).toThrow();
+    });
+
+    test('getLogger应该拒绝包含特殊字符的模块名', () => {
+      expect(() => {
+        getLogger('Invalid/Module');
+      }).toThrow();
+
+      expect(() => {
+        getLogger('Invalid.Module');
+      }).toThrow();
     });
 
     test('默认logger应该可以正常工作', () => {
