@@ -85,6 +85,10 @@ export class ContextBuilder {
     parts.push('## 当前环境观察\n');
     parts.push(this.formatBasicInfo(allData.baseInfo));
 
+    // 最近的聊天记录
+    parts.push('\n## 最近聊天\n');
+    parts.push(this.getRecentConversationSummary());
+
     // 最近的决策历史（从 DecisionMemory 获取）
     parts.push('\n## 最近决策历史\n');
     parts.push(this.getRecentDecisionSummary());
@@ -159,6 +163,20 @@ export class ContextBuilder {
       return '暂无最近思考';
     }
     return recentThoughts.map((t, i) => `${i + 1}. ${t.content}`).join('\n');
+  }
+
+  private getRecentConversationSummary(): string {
+    const conversations = this.state.memory.conversation.getRecent(10);
+    if (conversations.length === 0) {
+      return '暂无最近聊天';
+    }
+    const botName = this.state.config.minecraft.username || this.state.context.gameState.playerName || '麦麦';
+    return conversations
+      .map(c => {
+        const speaker = c.speaker === botName ? '[我]' : `[${c.speaker}]`;
+        return `${speaker}: ${c.message}`;
+      })
+      .join('\n');
   }
 
   private getGoalAndTaskSummary(): string {
