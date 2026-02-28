@@ -14,7 +14,7 @@ export class ChatAction extends BaseAction<ChatParams> {
   readonly name = 'ChatAction';
   readonly description = '发送聊天消息到游戏中';
 
-  async execute(context: RuntimeContext, params: ChatParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: ChatParams): Promise<ActionResult> {
     const { message } = params;
 
     try {

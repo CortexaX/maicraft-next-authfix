@@ -263,7 +263,6 @@ class MaicraftTestBot {
     });
 
     const locationManager = new LocationManager();
-    const interruptSignal = new (await import('./core/interrupt/InterruptSignal')).InterruptSignal();
 
     const { CacheManager } = await import('./core/cache/CacheManager');
     const cacheManager = new CacheManager(this.bot, blockCache, containerCache, {
@@ -295,7 +294,7 @@ class MaicraftTestBot {
       blockCache,
       containerCache,
       locationManager,
-      interruptSignal,
+      signal: new AbortController().signal,
       placeBlockUtils,
       movementUtils,
       craftManager: undefined as any,

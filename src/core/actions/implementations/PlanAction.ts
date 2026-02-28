@@ -46,7 +46,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
     return new TrackerFactory(context.events);
   }
 
-  async execute(context: RuntimeContext, params: PlanActionParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: PlanActionParams): Promise<ActionResult> {
     try {
       return await this.handleGoal(context, params);
     } catch (error) {

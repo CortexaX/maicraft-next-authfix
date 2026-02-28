@@ -14,7 +14,7 @@ export class TossItemAction extends BaseAction<TossItemParams> {
   readonly name = 'TossItemAction';
   readonly description = '丢弃指定物品';
 
-  async execute(context: RuntimeContext, params: TossItemParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: TossItemParams): Promise<ActionResult> {
     try {
       const { item, count = 1 } = params;
 

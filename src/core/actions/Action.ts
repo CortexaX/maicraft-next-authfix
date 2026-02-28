@@ -4,6 +4,7 @@
 
 import { RuntimeContext } from '@/core/context/RuntimeContext';
 import { ActionResult, BaseActionParams } from './types';
+import { CancellationError } from '@/core/interrupt/CancellationError';
 
 /**
  * 动作接口
@@ -54,12 +55,28 @@ export abstract class BaseAction<P extends BaseActionParams = BaseActionParams> 
   abstract readonly name: string;
   abstract readonly description: string;
 
-  abstract execute(context: RuntimeContext, params: P): Promise<ActionResult>;
+  async execute(context: RuntimeContext, params: P): Promise<ActionResult> {
+    if (context.signal.aborted) {
+      return this.failure(`动作被取消: ${(context.signal.reason as CancellationError)?.reason || '未知原因'}`);
+    }
+
+    try {
+      const result = await this.doExecute(context, params);
+      return result;
+    } catch (error) {
+      if (error instanceof CancellationError) {
+        return this.failure(`动作被取消: ${error.reason}`);
+      }
+      throw error;
+    }
+  }
+
+  protected abstract doExecute(context: RuntimeContext, params: P): Promise<ActionResult>;
 
   /**
    * 验证参数（默认实现）
    */
-  validateParams(params: P): boolean {
+  validateParams(_params: P): boolean {
     return true;
   }
 

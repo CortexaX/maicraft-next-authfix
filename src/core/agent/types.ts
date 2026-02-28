@@ -4,35 +4,26 @@
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
 import type { MemoryManager } from './memory/MemoryManager';
-import type { InterruptController } from './InterruptController';
 import type { AppConfig as Config } from '@/utils/Config';
-import type { InterruptSystem } from './interrupt/InterruptSystem';
 import type { ToolRegistry } from './tool/ToolRegistry';
+import type { InterruptManager } from '@/core/interrupt';
 
 /**
  * Agent 共享状态
  * 所有子系统都可以访问，但不能直接修改 Agent 内部实现
  */
 export interface AgentState {
-  // 基础信息
   readonly goal: string;
   isRunning: boolean;
 
-  // 运行时上下文（包含goalManager和taskManager）
   readonly context: RuntimeContext;
 
-  // 子系统
   readonly memory: MemoryManager;
-  readonly llmManager: any; // LLMManager 类型
+  readonly llmManager: any;
 
-  // 中断控制
-  readonly interrupt: InterruptController;
-
-  // 新架构组件（可选，用于外部访问）
-  readonly interruptSystem?: InterruptSystem;
+  readonly interruptManager: InterruptManager;
   readonly toolRegistry?: ToolRegistry;
 
-  // 配置
   readonly config: Config;
 }
 

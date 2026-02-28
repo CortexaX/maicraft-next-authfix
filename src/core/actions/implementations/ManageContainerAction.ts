@@ -20,7 +20,7 @@ export class ManageContainerAction extends BaseAction<any> {
     return false;
   }
 
-  async execute(context: RuntimeContext, params: ManageContainerParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: ManageContainerParams): Promise<ActionResult> {
     try {
       const { position, action, item, count, slot } = params;
 

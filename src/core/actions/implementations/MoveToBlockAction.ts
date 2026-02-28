@@ -14,7 +14,7 @@ export class MoveToBlockAction extends BaseAction<MoveToBlockParams> {
   readonly name = 'MoveToBlockAction';
   readonly description = '移动到指定类型的方块附近，便于交互';
 
-  async execute(context: RuntimeContext, params: MoveToBlockParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MoveToBlockParams): Promise<ActionResult> {
     const { blockType, reachDistance = 4, searchRadius = 64, allowPartial = false } = params;
 
     try {

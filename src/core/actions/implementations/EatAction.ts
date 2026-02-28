@@ -14,7 +14,7 @@ export class EatAction extends BaseAction<EatParams> {
   readonly name = 'EatAction';
   readonly description = '食用指定的食物';
 
-  async execute(context: RuntimeContext, params: EatParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: EatParams): Promise<ActionResult> {
     try {
       const { item } = params;
 

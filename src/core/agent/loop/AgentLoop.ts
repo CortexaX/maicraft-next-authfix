@@ -9,7 +9,7 @@ import { BaseLoop } from './BaseLoop';
 import type { AgentState } from '@/core/agent/types';
 import { LLMManager } from '@/llm/LLMManager';
 import { ToolRegistry } from '@/core/agent/tool/ToolRegistry';
-import { InterruptSystem } from '@/core/agent/interrupt/InterruptSystem';
+import { InterruptManager, CancellationError } from '@/core/interrupt';
 import { ContextBuilder } from './ContextBuilder';
 import type { ToolCall } from '@/llm/types';
 
@@ -20,15 +20,15 @@ import type { ToolCall } from '@/llm/types';
 export class AgentLoop extends BaseLoop<AgentState> {
   private llmManager: LLMManager;
   private toolRegistry: ToolRegistry;
-  private interruptSystem: InterruptSystem;
+  private interruptManager: InterruptManager;
   private contextBuilder: ContextBuilder;
   private loopCount: number = 0;
 
-  constructor(state: AgentState, llmManager: LLMManager, toolRegistry: ToolRegistry, interruptSystem: InterruptSystem) {
+  constructor(state: AgentState, llmManager: LLMManager, toolRegistry: ToolRegistry, interruptManager: InterruptManager) {
     super(state, 'AgentLoop');
     this.llmManager = llmManager;
     this.toolRegistry = toolRegistry;
-    this.interruptSystem = interruptSystem;
+    this.interruptManager = interruptManager;
     this.contextBuilder = new ContextBuilder(state);
   }
 
@@ -39,37 +39,34 @@ export class AgentLoop extends BaseLoop<AgentState> {
   protected async runLoopIteration(): Promise<void> {
     this.loopCount++;
 
-    // 1. 检查中断（战斗等）
-    const interruptHandler = this.interruptSystem.check();
-    if (interruptHandler) {
-      this.logger.info(`⚡ 检测到中断: ${interruptHandler.name}`);
-      await this.interruptSystem.handleInterrupt(interruptHandler);
-      return; // 中断处理后跳过本轮 LLM 决策
-    }
-
-    // 2. 检查手动中断
-    if (this.state.interrupt.isInterrupted()) {
-      const reason = this.state.interrupt.getReason();
-      this.state.interrupt.clear();
-      this.logger.warn(`⚠️ 循环被中断: ${reason}`);
-      await this.sleep(1000);
+    // 1. 检测自动中断（战斗等）
+    const handler = this.interruptManager.detect();
+    if (handler) {
+      this.logger.info(`检测到中断: ${handler.name}`);
+      await this.interruptManager.handleInterrupt(handler);
       return;
     }
 
-    // 3. 自动检测目标和任务完成
+    // 2. 创建本次迭代的取消信号
+    const signal = this.interruptManager.beginScope();
+
+    // 3. 更新 RuntimeContext 中的 signal（让后续动作能感知）
+    this.state.context.signal = signal;
+
+    // 4. 自动检测目标和任务完成
     await this.checkGoalAndTaskCompletion();
 
     try {
-      // 4. 构建 prompt
+      // 5. 构建 prompt
       const context = this.contextBuilder.buildContext();
 
-      // 5. 获取可用工具 schema
+      // 6. 获取可用工具 schema
       const toolSchemas = this.toolRegistry.getAvailableToolSchemas();
 
       this.logger.debug(`调用 LLM，可用工具: ${toolSchemas.length} 个`);
 
-      // 6. LLM function-calling 调用
-      const toolCalls = await this.llmManager.callTool(context.userPrompt, toolSchemas, context.systemPrompt);
+      // 7. LLM function-calling 调用（传入 signal，可被取消）
+      const toolCalls = await this.llmManager.callTool(context.userPrompt, toolSchemas, context.systemPrompt, { signal });
 
       if (!toolCalls || toolCalls.length === 0) {
         // LLM 没有调用工具，可能是思考或结束
@@ -78,15 +75,20 @@ export class AgentLoop extends BaseLoop<AgentState> {
         return;
       }
 
-      // 7. 执行所有工具调用
+      // 8. 执行所有工具调用
       for (const toolCall of toolCalls) {
+        signal.throwIfAborted();
         await this.executeToolCall(toolCall);
       }
 
-      // 8. 自适应延迟
+      // 9. 自适应延迟
       await this.adaptiveSleep();
     } catch (error) {
-      this.logger.error('❌ AgentLoop 迭代异常', undefined, error as Error);
+      if (error instanceof CancellationError) {
+        this.logger.info(`迭代被取消: ${error.reason}`);
+        return;
+      }
+      this.logger.error('AgentLoop 迭代异常', undefined, error as Error);
       await this.sleep(2000);
     }
   }

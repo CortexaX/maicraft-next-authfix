@@ -15,7 +15,7 @@ export class SetLocationAction extends BaseAction<SetLocationParams> {
   readonly name = 'SetLocationAction';
   readonly description = '地标管理：设置、删除、更新地标';
 
-  async execute(context: RuntimeContext, params: SetLocationParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: SetLocationParams): Promise<ActionResult> {
     try {
       const { type, name, info = '', position } = params;
 

@@ -4,7 +4,6 @@ import type { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
 import { LocationManager } from '@/core/cache/LocationManager';
-import { InterruptSignal } from '@/core/interrupt/InterruptSignal';
 import { EventManager } from '@/core/events/EventManager';
 import { GameState } from '@/core/state/GameState';
 import type { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
@@ -20,7 +19,7 @@ export interface ContextManagerParams {
   blockCache: BlockCache;
   containerCache: ContainerCache;
   locationManager: LocationManager;
-  interruptSignal: InterruptSignal;
+  signal: AbortSignal;
   placeBlockUtils: PlaceBlockUtils;
   movementUtils: MovementUtils;
   craftManager: CraftManager;
@@ -42,7 +41,7 @@ export class ContextManager {
       containerCache: params.containerCache,
       locationManager: params.locationManager,
       events,
-      interruptSignal: params.interruptSignal,
+      signal: params.signal,
       logger: params.logger,
       config: params.config,
       placeBlockUtils: params.placeBlockUtils,
@@ -61,7 +60,6 @@ export class ContextManager {
     return {
       ...this.context,
       logger: createPrefixedLogger(this.context.logger, actionName),
-      interruptSignal: new InterruptSignal(),
     };
   }
 

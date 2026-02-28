@@ -15,7 +15,7 @@ export class OpenChestGUIAction extends BaseAction<any> {
   readonly name = 'OpenChestGUIAction';
   readonly description = '打开箱子GUI模式，进入箱子交互界面。需要提供箱子位置坐标，之后由LLM决策具体的存取操作';
 
-  async execute(context: RuntimeContext, params: any): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: any): Promise<ActionResult> {
     // 这个动作不执行任何实际操作
     // 它的作用是被 MainMode 检测到，然后切换到箱子GUI模式
     // 实际的箱子操作由箱子模式内的其他动作完成

@@ -108,23 +108,6 @@ export class ActionExecutor {
   }
 
   /**
-   * 中断所有正在执行的动作
-   */
-  interruptAll(reason: string): void {
-    // 中断全局上下文中的中断信号
-    const context = this.contextManager.getContext();
-    context.interruptSignal.interrupt(reason);
-    this.logger.warn(`中断所有动作，原因: ${reason}`);
-  }
-
-  /**
-   * 中断当前动作
-   */
-  interrupt(reason: string): void {
-    this.interruptAll(reason);
-  }
-
-  /**
    * 获取已注册的动作列表
    */
   getRegisteredActions(): Action[] {

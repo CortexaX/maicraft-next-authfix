@@ -18,7 +18,7 @@ export * from './actions/types';
 export * from './crafting/CraftManager';
 
 // 中断机制
-export * from './interrupt/InterruptSignal';
+export * from './interrupt';
 
 // 缓存管理
 export * from './cache/BlockCache';

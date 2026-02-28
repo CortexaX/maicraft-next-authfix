@@ -13,16 +13,15 @@ import type { Logger } from '@/utils/Logger';
 import type { Bot } from 'mineflayer';
 import type { AppConfig as Config } from '@/utils/Config';
 import type { AgentState, AgentStatus } from './types';
-import { InterruptController } from './InterruptController';
 import { MemoryManager } from './memory/MemoryManager';
 import { AgentLoop } from './loop/AgentLoop';
 import { ChatLoop } from './loop/ChatLoop';
 import { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { PromptDataCollector } from './prompt/PromptDataCollector';
 import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
-import { ToolRegistry } from '@/core/agent/tool/ToolRegistry';
-import { InterruptSystem } from '@/core/agent/interrupt/InterruptSystem';
-import { CombatHandler } from '@/core/agent/interrupt/CombatHandler';
+import { ToolRegistry } from './tool/ToolRegistry';
+import { InterruptManager } from '@/core/interrupt';
+import { CombatHandler } from '@/core/interrupt/handlers/CombatHandler';
 
 export class Agent {
   // 共享状态（只读）
@@ -34,7 +33,7 @@ export class Agent {
 
   // 新架构组件
   private toolRegistry: ToolRegistry;
-  private interruptSystem: InterruptSystem;
+  private interruptManager: InterruptManager;
 
   // 数据收集器
   private dataCollector: PromptDataCollector;
@@ -56,7 +55,7 @@ export class Agent {
     llmManager: any,
     config: Config,
     memory: MemoryManager,
-    interrupt: InterruptController,
+    interruptManager: InterruptManager,
     logger?: Logger,
   ) {
     this.bot = bot;
@@ -70,7 +69,7 @@ export class Agent {
 
     // 创建新架构组件
     this.toolRegistry = new ToolRegistry(executor, context);
-    this.interruptSystem = new InterruptSystem(context.gameState);
+    this.interruptManager = interruptManager;
 
     this.state = {
       goal: config.agent?.goal || '探索世界',
@@ -78,14 +77,13 @@ export class Agent {
       context,
       memory,
       llmManager: this.llmManager,
-      interrupt,
-      interruptSystem: this.interruptSystem,
+      interruptManager: this.interruptManager,
       toolRegistry: this.toolRegistry,
       config,
     };
 
     // 创建决策循环（依赖 AgentState，在这里创建）
-    this.agentLoop = new AgentLoop(this.state, this.llmManager, this.toolRegistry, this.interruptSystem);
+    this.agentLoop = new AgentLoop(this.state, this.llmManager, this.toolRegistry, this.interruptManager);
     this.chatLoop = new ChatLoop(this.state, this.llmManager);
 
     // 初始化数据收集器
@@ -154,8 +152,8 @@ export class Agent {
 
       // 注册中断处理器（取代模式注册）
       const combatHandler = new CombatHandler(this.executor, this.state.memory, this.state.context.gameState);
-      this.interruptSystem.register(combatHandler);
-      this.logger.info('✅ 战斗中断处理器已注册');
+      this.interruptManager.register(combatHandler);
+      this.logger.info('战斗中断处理器已注册');
 
       this.logger.info('✅ Agent 初始化完成');
     } catch (error) {
@@ -234,27 +232,20 @@ export class Agent {
    * 设置事件监听（游戏逻辑相关）
    */
   private setupEventListeners(): void {
-    const { context, interrupt } = this.state;
+    const { context } = this.state;
 
     // 受伤事件 - 不再切换模式，由 InterruptSystem 在下一轮检测
     context.events.on('entityHurt', async (data: any) => {
       if (data.entity?.id === context.bot.entity?.id) {
-        this.state.memory.recordThought('⚔️ 受到攻击', { entity: data.entity });
+        this.state.memory.recordThought('受到攻击', { entity: data.entity });
         // InterruptSystem 会在下一轮循环检测到威胁
       }
     });
 
-    // 死亡事件 - 触发中断
-    context.events.on('death', () => {
-      interrupt.trigger('玩家死亡');
-      this.logger.warn('💀 玩家死亡');
-      this.state.memory.recordThought('💀 玩家死亡，需要重生', {});
-    });
-
     // 重生事件 - 恢复正常状态
     context.events.on('spawn', () => {
-      this.logger.info('🎮 玩家重生');
-      this.state.memory.recordThought('🎮 玩家重生，恢复正常活动', {});
+      this.logger.info('玩家重生');
+      this.state.memory.recordThought('玩家重生，恢复正常活动', {});
     });
 
     // 健康和饥饿状态变化 - AI决策相关
@@ -306,11 +297,11 @@ export class Agent {
 
     return {
       isRunning: this.isRunning,
-      currentMode: this.interruptSystem.isHandling() ? 'interrupt' : 'normal',
+      currentMode: this.interruptManager.isHandling ? 'interrupt' : 'normal',
       goal: currentGoal?.content || this.state.goal,
-      currentTask: null, // 新系统中不再有单一的currentTask概念
-      interrupted: this.state.interrupt.isInterrupted(),
-      interruptReason: this.state.interrupt.getReason(),
+      currentTask: null,
+      interrupted: this.state.context.signal.aborted,
+      interruptReason: (this.state.context.signal.reason as Error)?.message || '',
     };
   }
 

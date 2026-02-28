@@ -14,7 +14,7 @@ export class MoveToLocationAction extends BaseAction<MoveToLocationParams> {
   readonly name = 'MoveToLocationAction';
   readonly description = '移动到预先保存的命名位置';
 
-  async execute(context: RuntimeContext, params: MoveToLocationParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MoveToLocationParams): Promise<ActionResult> {
     const { locationName, reachDistance = 1, allowPartial = false } = params;
 
     try {

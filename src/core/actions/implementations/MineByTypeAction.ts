@@ -81,7 +81,7 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
     熔岩流: 'flowing_lava',
   };
 
-  async execute(context: RuntimeContext, params: MineByTypeParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MineByTypeParams): Promise<ActionResult> {
     const { blockType, count = 1, radius = 32, direction, force = false, collect = true } = params;
 
     try {
@@ -132,7 +132,7 @@ export class MineByTypeAction extends BaseAction<MineByTypeParams> {
 
       for (let i = 0; i < count; i++) {
         // 检查中断
-        context.interruptSignal.throwIfInterrupted();
+        context.signal.throwIfAborted();
 
         let result: ActionResult;
 

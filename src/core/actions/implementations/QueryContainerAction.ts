@@ -20,7 +20,7 @@ export class QueryContainerAction extends BaseAction<any> {
     return false;
   }
 
-  async execute(context: RuntimeContext, params: QueryContainerParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: QueryContainerParams): Promise<ActionResult> {
     try {
       const { position } = params;
 

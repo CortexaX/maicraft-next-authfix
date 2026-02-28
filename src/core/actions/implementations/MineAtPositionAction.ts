@@ -26,7 +26,7 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
   readonly name = 'MineAtPositionAction';
   readonly description = '在指定位置精准挖掘方块';
 
-  async execute(context: RuntimeContext, params: MineAtPositionParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MineAtPositionParams): Promise<ActionResult> {
     const { x, y, z, count = 1, force = false, collect = true } = params;
 
     try {
@@ -51,7 +51,7 @@ export class MineAtPositionAction extends BaseAction<MineAtPositionParams> {
 
       for (let i = 0; i < count; i++) {
         // 检查中断
-        context.interruptSignal.throwIfInterrupted();
+        context.signal.throwIfAborted();
 
         const result = await this.digSingleBlock(context, position, force, collect);
         results.push(result);

@@ -15,7 +15,7 @@ export class SwimToLandAction extends BaseAction<SwimToLandParams> {
   readonly name = 'SwimToLandAction';
   readonly description = '游向最近的陆地';
 
-  async execute(context: RuntimeContext, params: SwimToLandParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: SwimToLandParams): Promise<ActionResult> {
     try {
       const maxDist = 64;
       const timeoutSec = 60;

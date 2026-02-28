@@ -120,7 +120,7 @@ export abstract class ContainerInteractAction<P extends ContainerInteractParams 
   /**
    * 主执行流程
    */
-  async execute(context: RuntimeContext, params: P): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: P): Promise<ActionResult> {
     const { x, y, z, intent } = params;
 
     if (!context.llmManager) {
@@ -237,7 +237,7 @@ export abstract class ContainerInteractAction<P extends ContainerInteractParams 
 
           for (const op of operations) {
             // 检查中断信号
-            if (context.interruptSignal?.isInterrupted?.()) {
+            if (context.signal.aborted) {
               context.logger.warn(`[${this.getContainerType()}] 操作被中断`);
               diffSummary.errors.push('操作被中断');
               break;

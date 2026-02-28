@@ -14,7 +14,7 @@ export class MoveToEntityAction extends BaseAction<MoveToEntityParams> {
   readonly name = 'MoveToEntityAction';
   readonly description = '移动到指定类型的实体附近或跟随实体';
 
-  async execute(context: RuntimeContext, params: MoveToEntityParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MoveToEntityParams): Promise<ActionResult> {
     const { entityName, entityType, followDistance = 3, maxDistance = 100, continuous = false } = params;
 
     try {

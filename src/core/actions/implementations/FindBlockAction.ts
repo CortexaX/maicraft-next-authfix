@@ -15,7 +15,7 @@ export class FindBlockAction extends BaseAction<FindBlockParams> {
   readonly name = 'FindBlockAction';
   readonly description = '在视野内寻找可以直接看见的指定方块';
 
-  async execute(context: RuntimeContext, params: FindBlockParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: FindBlockParams): Promise<ActionResult> {
     const { block, radius = 8, count = 1 } = params;
 
     try {

@@ -14,7 +14,7 @@ export class PlaceBlockAction extends BaseAction<PlaceBlockParams> {
   readonly name = 'PlaceBlockAction';
   readonly description = '在指定位置放置方块';
 
-  async execute(context: RuntimeContext, params: PlaceBlockParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: PlaceBlockParams): Promise<ActionResult> {
     const { block, x, y, z } = params;
 
     try {

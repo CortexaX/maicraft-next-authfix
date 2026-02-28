@@ -15,7 +15,7 @@ export class KillMobAction extends BaseAction<KillMobParams> {
   readonly name = 'KillMobAction';
   readonly description = '击杀指定名称的生物';
 
-  async execute(context: RuntimeContext, params: KillMobParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: KillMobParams): Promise<ActionResult> {
     try {
       const timeoutMs = (params.timeout ?? 300) * 1000;
       const startTime = Date.now();

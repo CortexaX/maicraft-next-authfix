@@ -64,22 +64,29 @@ export class OpenAIProvider implements ILLMProvider {
 
     return this.withRetry(async () => {
       try {
-        // 发送请求
-        const completion = await this.client.chat.completions.create({
-          model: validatedConfig.model,
-          messages: validatedConfig.messages.map(msg => ({
-            role: msg.role as 'system' | 'user' | 'assistant',
-            content: msg.content,
-            name: msg.name,
-          })),
-          max_tokens: validatedConfig.max_tokens,
-          temperature: validatedConfig.temperature,
-          top_p: validatedConfig.top_p,
-          frequency_penalty: validatedConfig.frequency_penalty,
-          presence_penalty: validatedConfig.presence_penalty,
-          stop: validatedConfig.stop,
-          stream: false, // 暂时不支持流式
-        });
+        const options: { signal?: AbortSignal } = {};
+        if (validatedConfig.signal) {
+          options.signal = validatedConfig.signal;
+        }
+
+        const completion = await this.client.chat.completions.create(
+          {
+            model: validatedConfig.model,
+            messages: validatedConfig.messages.map(msg => ({
+              role: msg.role as 'system' | 'user' | 'assistant',
+              content: msg.content,
+              name: msg.name,
+            })),
+            max_tokens: validatedConfig.max_tokens,
+            temperature: validatedConfig.temperature,
+            top_p: validatedConfig.top_p,
+            frequency_penalty: validatedConfig.frequency_penalty,
+            presence_penalty: validatedConfig.presence_penalty,
+            stop: validatedConfig.stop,
+            stream: false,
+          },
+          options,
+        );
 
         // 转换响应格式
         const response: LLMResponse = {
@@ -261,7 +268,6 @@ export class OpenAIProvider implements ILLMProvider {
    * 验证请求配置
    */
   private validateRequestConfig(config: LLMRequestConfig): ValidatedLLMRequestConfig {
-    // 合并默认配置
     const mergedConfig = {
       model: config.model || this.config.model,
       messages: config.messages,
@@ -272,9 +278,9 @@ export class OpenAIProvider implements ILLMProvider {
       presence_penalty: config.presence_penalty,
       stop: config.stop,
       stream: config.stream ?? false,
+      signal: config.signal,
     };
 
-    // 验证配置
     return this.validateWithSchema(mergedConfig);
   }
 
@@ -300,6 +306,7 @@ export class OpenAIProvider implements ILLMProvider {
       presence_penalty: z.number().min(-2).max(2).optional(),
       stop: z.union([z.string(), z.array(z.string())]).optional(),
       stream: z.boolean().default(false),
+      signal: z.any().optional(),
     });
 
     return schema.parse(config) as ValidatedLLMRequestConfig;

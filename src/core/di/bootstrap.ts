@@ -8,13 +8,11 @@ import { CacheManager } from '@/core/cache/CacheManager';
 import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import { GameState } from '@/core/state/GameState';
 import { ContextManager } from '@/core/context/ContextManager';
-import { InterruptSignal } from '@/core/interrupt/InterruptSignal';
 import { ActionExecutor } from '@/core/actions/ActionExecutor';
 import { LLMManager } from '@/llm/LLMManager';
 import { UsageTracker } from '@/llm/usage/UsageTracker';
 import { MaiBotClient } from '@/core/agent/communication/MaiBotClient';
 import { MemoryManager } from '@/core/agent/memory/MemoryManager';
-import { InterruptController } from '@/core/agent/InterruptController';
 import { GoalManager } from '@/core/agent/planning/goal/GoalManager';
 import { TrackerFactory } from '@/core/agent/planning/trackers/TrackerFactory';
 import { LoggerFactory } from '@/utils/Logger';
@@ -27,6 +25,7 @@ import { MovementUtils } from '@/utils/MovementUtils';
 import { CraftManager } from '@/core/crafting/CraftManager';
 import { Agent } from '@/core/agent/Agent';
 import { WebSocketServer } from '@/api/WebSocketServer';
+import { InterruptManager } from '@/core/interrupt';
 import {
   ChatAction,
   MoveAction,
@@ -63,7 +62,6 @@ export interface AppServices {
   nearbyBlockManager: NearbyBlockManager;
   gameState: GameState;
   goalManager: GoalManager;
-  interruptSignal: InterruptSignal;
   movementUtils: MovementUtils;
   placeBlockUtils: PlaceBlockUtils;
   craftManager: CraftManager;
@@ -73,7 +71,7 @@ export interface AppServices {
   llmManager: LLMManager;
   maiBotClient?: MaiBotClient;
   memoryManager: MemoryManager;
-  interruptController: InterruptController;
+  interruptManager: InterruptManager;
   trackerFactory: TrackerFactory;
   loggerFactory: LoggerFactory;
   configLoader: ConfigLoader;
@@ -123,7 +121,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
   });
 
   const goalManager = new GoalManager();
-  const interruptSignal = new InterruptSignal();
 
   const movementUtils = new MovementUtils(logger);
   const placeBlockUtils = new PlaceBlockUtils(logger, movementUtils);
@@ -137,7 +134,7 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     blockCache,
     containerCache,
     locationManager,
-    interruptSignal,
+    signal: new AbortController().signal,
     placeBlockUtils,
     movementUtils,
     craftManager,
@@ -158,14 +155,14 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 
   const memoryManager = new MemoryManager(config, logger, maiBotClient);
 
-  const interruptController = new InterruptController();
+  const interruptManager = new InterruptManager(gameState, actionExecutor.getEventManager());
   const trackerFactory = new TrackerFactory(actionExecutor.getEventManager());
   const loggerFactory = new LoggerFactory();
   const configLoader = new ConfigLoader();
   const promptManager = new PromptManager();
   const promptOverrideManager = createPromptOverrideManager(getDefaultOverrideTemplates());
 
-  const agent = new Agent(bot, actionExecutor, llmManager, config, memoryManager, interruptController, logger);
+  const agent = new Agent(bot, actionExecutor, llmManager, config, memoryManager, interruptManager, logger);
 
   const wsServer = new WebSocketServer();
 
@@ -177,7 +174,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     nearbyBlockManager,
     gameState,
     goalManager,
-    interruptSignal,
     movementUtils,
     placeBlockUtils,
     craftManager,
@@ -187,7 +183,7 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     llmManager,
     maiBotClient,
     memoryManager,
-    interruptController,
+    interruptManager,
     trackerFactory,
     loggerFactory,
     configLoader,

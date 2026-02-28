@@ -24,7 +24,7 @@ export class MineInDirectionAction extends BaseAction<MineInDirectionNewParams> 
   readonly name = 'MineInDirectionAction';
   readonly description = '沿指定方向连续挖掘，创建隧道或矿井';
 
-  async execute(context: RuntimeContext, params: MineInDirectionNewParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MineInDirectionNewParams): Promise<ActionResult> {
     const { direction, count = 10, force = false, collect = true } = params;
 
     try {
@@ -54,7 +54,7 @@ export class MineInDirectionAction extends BaseAction<MineInDirectionNewParams> 
 
       for (let i = 0; i < count; i++) {
         // 检查中断
-        context.interruptSignal.throwIfInterrupted();
+        context.signal.throwIfAborted();
 
         // 计算当前目标位置
         const targetPos = startPos.plus(directionVector.scaled(i + 1));

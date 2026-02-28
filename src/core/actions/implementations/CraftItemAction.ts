@@ -18,7 +18,7 @@ export class CraftItemAction extends BaseAction<CraftParams> {
   readonly name = 'CraftItemAction';
   readonly description = '智能合成物品，自动处理配方、材料和工作台';
 
-  async execute(context: RuntimeContext, params: CraftParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: CraftParams): Promise<ActionResult> {
     const { item, count = 1, requiredMaterials, maxComplexity } = params;
 
     try {

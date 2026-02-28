@@ -15,7 +15,7 @@ export class OpenFurnaceGUIAction extends BaseAction<any> {
   readonly name = 'OpenFurnaceGUIAction';
   readonly description = '打开熔炉GUI模式，进入熔炉交互界面。需要提供熔炉位置坐标，之后由LLM决策具体的放入/取出操作';
 
-  async execute(context: RuntimeContext, params: any): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: any): Promise<ActionResult> {
     // 这个动作不执行任何实际操作
     // 它的作用是被 MainMode 检测到，然后切换到熔炉GUI模式
     // 实际的熔炉操作由熔炉模式内的其他动作完成

@@ -14,7 +14,7 @@ export class MoveAction extends BaseAction<MoveParams> {
   readonly name = 'MoveAction';
   readonly description = '移动到指定坐标';
 
-  async execute(context: RuntimeContext, params: MoveParams): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: MoveParams): Promise<ActionResult> {
     const { x, y, z } = params;
 
     try {

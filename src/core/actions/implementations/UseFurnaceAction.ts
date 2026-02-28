@@ -32,7 +32,7 @@ export class UseFurnaceAction extends BaseAction<any> {
     return false;
   }
 
-  async execute(context: RuntimeContext, params: any): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: any): Promise<ActionResult> {
     try {
       const { action = 'view', items = [], x, y, z, container_type = 'furnace' } = params;
 

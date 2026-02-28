@@ -101,8 +101,9 @@ export interface LLMRequestConfig {
   stop?: string | string[];
   stream?: boolean;
   timeout?: number;
-  tools?: any[]; // 工具列表
-  tool_choice?: any; // 工具选择策略
+  tools?: any[];
+  tool_choice?: any;
+  signal?: AbortSignal;
   response_format?: {
     // JSON Schema structured output support
     type: 'json_object' | 'json_schema' | 'text';
@@ -405,6 +406,7 @@ export const LLMRequestConfigSchema = z.object({
   presence_penalty: z.number().min(-2).max(2).optional(),
   stop: z.union([z.string(), z.array(z.string())]).optional(),
   stream: z.boolean().optional().default(false),
+  signal: z.any().optional(),
 });
 
 // 导出类型

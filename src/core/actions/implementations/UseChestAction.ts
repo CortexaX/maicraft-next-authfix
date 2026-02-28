@@ -46,7 +46,7 @@ export class UseChestAction extends BaseAction<any> {
     return false;
   }
 
-  async execute(context: RuntimeContext, params: any): Promise<ActionResult> {
+  protected async doExecute(context: RuntimeContext, params: any): Promise<ActionResult> {
     try {
       const { action = 'store', items = [], x, y, z } = params;
 
