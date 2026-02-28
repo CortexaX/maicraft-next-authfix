@@ -70,7 +70,7 @@ export class ContextManager {
 
     this.context = {
       bot,
-      executor: executor || ({} as ActionExecutor), // 临时赋值，后续会更新
+      executor: executor || ({} as ActionExecutor),
       gameState,
       blockCache: gameState.blockCache!,
       containerCache: gameState.containerCache!,
@@ -81,9 +81,8 @@ export class ContextManager {
       config,
       placeBlockUtils,
       movementUtils,
-      craftManager: undefined as unknown as CraftManager, // 延迟初始化
-      goalManager: undefined, // 延迟初始化
-      taskManager: undefined, // 延迟初始化
+      craftManager: undefined as unknown as CraftManager,
+      goalManager: undefined,
     };
 
     return this.context!;
@@ -107,7 +106,6 @@ export class ContextManager {
     movementUtils: MovementUtils;
     craftManager: CraftManager;
     goalManager?: any;
-    taskManager?: any;
   }): RuntimeContext {
     if (this.context) {
       throw new Error('Context already created. Use getContext() to access existing context.');
@@ -127,7 +125,6 @@ export class ContextManager {
       movementUtils,
       craftManager,
       goalManager,
-      taskManager,
     } = params;
 
     // 初始化 GameState
@@ -138,7 +135,7 @@ export class ContextManager {
 
     this.context = {
       bot,
-      executor: executor || ({} as ActionExecutor), // 临时赋值，后续会更新
+      executor: executor || ({} as ActionExecutor),
       gameState,
       blockCache,
       containerCache,
@@ -151,10 +148,9 @@ export class ContextManager {
       movementUtils,
       craftManager,
       goalManager,
-      taskManager,
     };
 
-    return this.context;
+    return this.context!;
   }
 
   /**

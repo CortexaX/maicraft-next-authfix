@@ -158,7 +158,6 @@ export interface RuntimeContext {
 
   // 规划管理
   goalManager: any; // GoalManager - 延迟导入避免循环依赖
-  taskManager: any; // TaskManager - 延迟导入避免循环依赖
 }
 
 /**
