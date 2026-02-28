@@ -138,7 +138,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const message = this.parseChatResponse(response);
 
       if (message) {
-        await this.state.context.executor.execute(ActionIds.CHAT, { message });
+        await this.state.context.executor!.execute(ActionIds.CHAT, { message });
         this.state.memory.recordConversation(this.state.context.gameState.playerName || '麦麦', message);
         this.logger.info(`💬 发送聊天: ${message}`);
       }
@@ -147,9 +147,6 @@ export class ChatLoop extends BaseLoop<AgentState> {
     }
   }
 
-  /**
-   * 主动发起聊天
-   */
   private async initiateChat(): Promise<void> {
     try {
       const recentConversations = this.state.memory.conversation.getRecent(5);
@@ -178,7 +175,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const message = this.parseChatResponse(response);
 
       if (message) {
-        await this.state.context.executor.execute(ActionIds.CHAT, { message });
+        await this.state.context.executor!.execute(ActionIds.CHAT, { message });
         this.state.memory.recordConversation(this.state.context.gameState.playerName || '麦麦', message);
         this.logger.info(`💬 主动聊天: ${message}`);
       }

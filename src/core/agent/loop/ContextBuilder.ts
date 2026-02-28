@@ -29,7 +29,7 @@ export class ContextBuilder {
     this.state = state;
 
     // 复用 PromptDataCollector
-    const actionPromptGenerator = new ActionPromptGenerator(state.context.executor);
+    const actionPromptGenerator = new ActionPromptGenerator(state.context.executor!);
     this.dataCollector = new PromptDataCollector(state, actionPromptGenerator);
   }
 
