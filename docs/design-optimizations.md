@@ -335,7 +335,8 @@ interface AgentState {
   goal: string;
   isRunning: boolean;
   context: RuntimeContext;
-  modeManager: ModeManager;
+  interruptSystem: InterruptSystem; // 新架构使用 InterruptSystem
+  toolRegistry: ToolRegistry; // 新架构使用 ToolRegistry
   planningManager: GoalPlanningManager;
   memory: MemoryManager;
   interrupt: InterruptController;

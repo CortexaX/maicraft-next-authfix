@@ -8,9 +8,9 @@
 
 Agent 是整个系统的**主协调器**，负责：
 
-1. **初始化和管理**所有子系统（记忆、规划、模式等）
-2. **协调**决策循环（MainDecisionLoop、ChatLoop）的运行
-3. **管理**Agent 的生命周期（启动、停止、暂停）
+1. **初始化和管理**所有子系统（记忆、规划、工具等）
+2. **协调**决策循环（AgentLoop、ChatLoop）的运行
+3. **管理**Agent 的生命周期（启动、停止）
 4. **提供**统一的状态访问接口
 
 ---
@@ -23,13 +23,19 @@ Agent (主协调器)
   │   ├── RuntimeContext (运行时上下文)
   │   ├── MemoryManager (记忆管理)
   │   ├── GoalPlanningManager (规划管理)
-  │   ├── ModeManager (模式管理)
-  │   └── InterruptController (中断控制)
+  │   ├── InterruptSystem (中断系统)
+  │   └── ToolRegistry (工具注册表)
   │
-  ├── MainDecisionLoop (主决策循环)
+  ├── AgentLoop (ReAct 主决策循环)
   ├── ChatLoop (聊天循环)
   └── EventListeners (事件监听器)
 ```
+
+**新架构特点**：
+
+- 使用 **AgentLoop** 取代 MainDecisionLoop，直接使用 LLM function-calling
+- 使用 **InterruptSystem** 取代 ModeManager，按优先级处理中断
+- 使用 **ToolRegistry** 将 Action 转换为 function-calling schema
 
 ---
 
@@ -57,21 +63,21 @@ const llmManager = LLMManagerFactory.create(config.llm, logger);
 // 4. 创建 Agent
 const agent = new Agent(bot, executor, llmManager, config);
 
-// 5. 启动 Agent
+// 5. 初始化
+await agent.initialize();
+
+// 6. 启动 Agent
 await agent.start();
 ```
 
 ### Agent 生命周期
 
 ```typescript
+// 初始化
+await agent.initialize();
+
 // 启动
 await agent.start();
-
-// 暂停
-await agent.pause();
-
-// 恢复
-await agent.resume();
 
 // 停止
 await agent.stop();
@@ -94,36 +100,41 @@ interface AgentState {
   goal: string; // 当前总目标
   isRunning: boolean; // 运行状态
   context: RuntimeContext; // 运行时上下文
-  modeManager: ModeManager; // 模式管理器
-  planningManager: GoalPlanningManager; // 规划管理器
   memory: MemoryManager; // 记忆管理器
+  llmManager: LLMManager; // LLM 管理器
   interrupt: InterruptController; // 中断控制器
+  interruptSystem: InterruptSystem; // 中断系统
+  toolRegistry: ToolRegistry; // 工具注册表
   config: Config; // 配置对象
 }
 ```
 
-### 2. MainDecisionLoop - 主决策循环
+### 2. AgentLoop - ReAct 主决策循环
 
-负责 Agent 的主要决策逻辑：
+负责 Agent 的主要决策逻辑，采用 ReAct 模式：
 
 ```typescript
-class MainDecisionLoop {
-  async run(): Promise<void> {
-    while (this.state.isRunning) {
-      // 1. 生成 prompt
-      const prompt = await this.generatePrompt();
+class AgentLoop {
+  protected async runLoopIteration(): Promise<void> {
+    // 1. 检查中断
+    const handler = this.interruptSystem.check();
+    if (handler) {
+      await this.interruptSystem.handleInterrupt(handler);
+      return;
+    }
 
-      // 2. 调用 LLM
-      const response = await this.llmManager.chat(prompt);
+    // 2. 构建上下文
+    const context = this.contextBuilder.buildContext();
 
-      // 3. 解析和执行动作
-      await this.executeAction(response);
+    // 3. 获取工具 schema
+    const toolSchemas = this.toolRegistry.getAvailableToolSchemas();
 
-      // 4. 更新状态和记忆
-      await this.updateState();
+    // 4. LLM function-calling
+    const toolCalls = await this.llmManager.callTool(context.userPrompt, toolSchemas, context.systemPrompt);
 
-      // 5. 等待下一次循环
-      await this.sleep();
+    // 5. 执行工具
+    for (const toolCall of toolCalls) {
+      await this.executeToolCall(toolCall);
     }
   }
 }
@@ -152,18 +163,63 @@ class ChatLoop {
 }
 ```
 
+### 4. InterruptSystem - 中断系统
+
+处理战斗等紧急情况：
+
+```typescript
+class InterruptSystem {
+  register(handler: InterruptHandler): void;
+  check(): InterruptHandler | null;
+  async handleInterrupt(handler: InterruptHandler): Promise<void>;
+}
+```
+
+### 5. ToolRegistry - 工具注册表
+
+将 Action 转换为 LLM function-calling 格式：
+
+```typescript
+class ToolRegistry {
+  getToolSchemas(): ToolSchema[];
+  getAvailableToolSchemas(): ToolSchema[];
+  async executeTool(name: string, args: Record<string, any>): Promise<any>;
+}
+```
+
 ---
 
-## 🔄 与 Maicraft Python 的对比
+## 🔄 架构演进
 
-| 方面         | Maicraft Python        | Maicraft-Next        |
-| ------------ | ---------------------- | -------------------- |
-| **主类**     | MaiAgent               | Agent                |
-| **架构**     | 扁平，所有逻辑在一个类 | 模块化，清晰的子系统 |
-| **决策循环** | think_loop 方法        | MainDecisionLoop 类  |
-| **聊天处理** | chat_loop 方法         | ChatLoop 类          |
-| **状态管理** | 全局变量               | AgentState 共享对象  |
-| **模式系统** | mode_manager           | ModeManager          |
+### 旧架构 (模式系统)
+
+```
+Agent
+  └── MainDecisionLoop
+        └── ModeManager
+              ├── MainMode
+              ├── CombatMode
+              ├── ChestMode
+              └── FurnaceMode
+```
+
+**问题**：调用链过长（6层），LLM 决策被模式分割
+
+### 新架构 (ReAct + 中断)
+
+```
+Agent
+  └── AgentLoop
+        ├── InterruptSystem (战斗等)
+        ├── ToolRegistry (工具)
+        └── LLMManager.callTool() (直接 function-calling)
+```
+
+**优势**：
+
+- LLM 是中央决策者
+- 调用链简化（3层）
+- 统一的工具调用机制
 
 ---
 
@@ -172,9 +228,9 @@ class ChatLoop {
 - [架构概览](architecture-overview.md)
 - [记忆系统](memory-system.md)
 - [规划系统](planning-system.md)
-- [模式系统](mode-system.md)
+- [中断系统](interrupt-system.md)
 - [决策循环](decision-loop.md)
 
 ---
 
-_最后更新: 2025-11-01_
+_最后更新: 2026-02-28_

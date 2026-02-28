@@ -12,20 +12,20 @@
 │          (主协调器 - 管理所有子系统)                          │
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐    │
-│  │MemoryManager │  │PlanningManager│  │ ModeManager  │    │
+│  │MemoryManager │  │PlanningManager│  │InterruptSystem│    │
 │  │              │  │               │  │              │    │
-│  │- Thought     │  │- Goals        │  │- MainMode    │    │
-│  │- Conversation│  │- Plans        │  │- CombatMode  │    │
-│  │- Decision    │  │- Tasks        │  │- MainMode    │    │
-│  │- Experience  │  │- Trackers     │  │- CombatMode  │    │
-│  │              │  │               │  │-监听器机制    │    │
+│  │- Thought     │  │- Goals        │  │- CombatHandler│   │
+│  │- Conversation│  │- Plans        │  │- (战斗中断)   │    │
+│  │- Decision    │  │- Tasks        │  │- ToolRegistry │    │
+│  │- Experience  │  │- Trackers     │  │- (工具注册)   │    │
+│  │              │  │               │  │              │    │
 │  └──────────────┘  └──────────────┘  └──────────────┘    │
 │                                                             │
 │  ┌──────────────────────────────────────────────────┐     │
 │  │           Decision Loops                          │     │
 │  │  ┌──────────────────┐  ┌──────────────────┐     │     │
-│  │  │MainDecisionLoop  │  │   ChatLoop       │     │     │
-│  │  │  (主决策循环)     │  │  (聊天循环)       │     │     │
+│  │  │  AgentLoop       │  │   ChatLoop       │     │     │
+│  │  │  (ReAct主决策循环) │  │  (聊天循环)       │     │     │
 │  │  └──────────────────┘  └──────────────────┘     │     │
 │  └──────────────────────────────────────────────────┘     │
 │                                                             │
@@ -151,10 +151,11 @@ await executor.execute(ActionIds.MINE_BLOCK, {
 2. **ActionExecutor** - 动作执行，连接到 bot
 3. **MemoryManager** - 记忆管理
 4. **GoalPlanningManager** - 目标和任务规划
-5. **ModeManager** - 模式管理和切换
-6. **GameState** - 游戏状态同步
-7. **EventEmitter** - 统一事件管理
-8. **LLMManager** - LLM 调用管理
+5. **InterruptSystem** - 中断系统（战斗等被动响应）
+6. **ToolRegistry** - 工具注册表（Action 转 function-calling）
+7. **GameState** - 游戏状态同步
+8. **EventEmitter** - 统一事件管理
+9. **LLMManager** - LLM 调用管理
 
 **依赖关系**：
 
@@ -170,7 +171,7 @@ await executor.execute(ActionIds.MINE_BLOCK, {
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. MainDecisionLoop 获取上下文                               │
+│ 1. AgentLoop 获取上下文                                     │
 │    - GameState (当前状态)                                    │
 │    - Memory (历史记忆)                                       │
 │    - Planning (当前目标和任务)                                │
@@ -178,10 +179,41 @@ await executor.execute(ActionIds.MINE_BLOCK, {
                       │
                       ▼
 ┌─────────────────────────────────────────────────────────────┐
-│ 2. PromptManager 生成 Prompt                                │
-│    - 基本信息模板                                            │
-│    - 当前模式提示                                            │
-│    - 记忆和任务上下文                                        │
+│ 2. InterruptSystem.check() 检查中断                         │
+│    - CombatHandler 检测敌对生物                              │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. ContextBuilder 构建 Prompt                              │
+│    - system prompt (动态)                                   │
+│    - user prompt (环境观察)                                 │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. ToolRegistry 获取工具 Schema                             │
+│    - 将 Action 转为 function-calling 格式                  │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 5. LLMManager.callTool()                                   │
+│    - Function Calling 调用                                   │
+│    - 返回 tool_calls                                         │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 6. ToolRegistry.executeTool() 执行工具                      │
+│    - 委托给 ActionExecutor                                   │
+└─────────────────────┬───────────────────────────────────────┘
+                      │
+                      ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 7. Memory.recordDecision()                                  │
+│    - 记录决策和结果                                          │
+└─────────────────────────────────────────────────────────────┘
 └─────────────────────┬───────────────────────────────────────┘
                       │
                       ▼
@@ -331,12 +363,17 @@ interface RuntimeContext {
     ↓
 7. 创建 Agent
     ↓
-8. Agent.start()
-    ├─ 启动 MainDecisionLoop
+8. Agent.initialize()
+    ├─ 注册 InterruptSystem (CombatHandler)
+    ├─ 注册 ToolRegistry
+    └─ 加载记忆和目标
+    ↓
+9. Agent.start()
+    ├─ 启动 AgentLoop (ReAct 循环)
     ├─ 启动 ChatLoop
     └─ 设置事件监听器
     ↓
-9. 进入主循环
+10. 进入主循环
 ```
 
 ---
