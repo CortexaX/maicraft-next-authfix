@@ -37,7 +37,6 @@ export const ServiceKeys = {
   Agent: Symbol('Agent'),
   MemoryManager: Symbol('MemoryManager'),
   GoalManager: Symbol('GoalManager'),
-  TaskManager: Symbol('TaskManager'),
   InterruptController: Symbol('InterruptController'),
   MaiBotClient: Symbol('MaiBotClient'),
 
@@ -97,7 +96,6 @@ export interface ServiceTypeMap {
   [ServiceKeys.Agent]: import('@/core/agent/Agent').Agent;
   [ServiceKeys.MemoryManager]: import('@/core/agent/memory/MemoryManager').MemoryManager;
   [ServiceKeys.GoalManager]: import('@/core/agent/planning/goal/GoalManager').GoalManager;
-  [ServiceKeys.TaskManager]: import('@/core/agent/planning/task/TaskManager').TaskManager;
   [ServiceKeys.InterruptController]: import('@/core/agent/InterruptController').InterruptController;
   [ServiceKeys.MaiBotClient]: import('@/core/agent/communication/MaiBotClient').MaiBotClient;
   [ServiceKeys.ChatLoop]: import('@/core/agent/loop/ChatLoop').ChatLoop;

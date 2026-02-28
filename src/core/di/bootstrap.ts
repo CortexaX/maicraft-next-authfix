@@ -117,12 +117,6 @@ export function configureServices(container: Container): void {
     return new GoalManager();
   });
 
-  // TaskManager (单例) - 必须在ContextManager之前注册
-  container.registerSingleton(ServiceKeys.TaskManager, c => {
-    const { TaskManager } = require('@/core/agent/planning/task/TaskManager');
-    return new TaskManager();
-  });
-
   // ContextManager (单例)
   container.registerSingleton(ServiceKeys.ContextManager, c => {
     const { ContextManager } = require('@/core/context/ContextManager');
@@ -141,7 +135,6 @@ export function configureServices(container: Container): void {
     const craftManager = c.resolve(ServiceKeys.CraftManager) as import('@/core/crafting/CraftManager').CraftManager;
     const interruptSignal = c.resolve(ServiceKeys.InterruptSignal);
     const goalManager = c.resolve(ServiceKeys.GoalManager);
-    const taskManager = c.resolve(ServiceKeys.TaskManager);
 
     contextManager.createContextWithDI({
       bot,
@@ -157,7 +150,6 @@ export function configureServices(container: Container): void {
       movementUtils,
       craftManager,
       goalManager,
-      taskManager,
     });
 
     return contextManager;
