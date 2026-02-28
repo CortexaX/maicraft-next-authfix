@@ -9,8 +9,8 @@ import { PromptTemplate, promptManager } from '@/core/agent/prompt/prompt_manage
 
 const chestOperationTemplateContent = `你是{bot_name}，游戏名叫{player_name}，你正在游玩Minecraft，是一名Minecraft玩家。
 
-# 上下文信息
-{context_info}
+# 操作意图
+{intent}
 
 {current_goal}
 {current_tasks}
@@ -18,9 +18,12 @@ const chestOperationTemplateContent = `你是{bot_name}，游戏名叫{player_na
 # 当前箱子内容
 {chest_gui}
 
+# 你的背包内容
+{inventory_info}
+
 # 你的任务
 你正在操作一个箱子，需要进行物品的存取操作来整理库存或完成任务。
-请根据上面的思考记录和当前目标，决定存取哪些物品。
+请根据上面的上下文和当前目标，决定存取哪些物品。
 
 # 可执行的操作
 
@@ -170,10 +173,11 @@ export function initChestOperationTemplate(): void {
     new PromptTemplate('chest_operation', chestOperationTemplateContent, '箱子操作提示词模板', [
       'bot_name',
       'player_name',
-      'chest_gui',
-      'context_info',
+      'intent',
       'current_goal',
       'current_tasks',
+      'chest_gui',
+      'inventory_info',
     ]),
   );
 

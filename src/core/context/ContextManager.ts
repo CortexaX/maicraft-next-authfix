@@ -20,6 +20,7 @@ import { GameState } from '@/core/state/GameState';
 import type { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
 import type { MovementUtils } from '@/utils/MovementUtils';
 import type { CraftManager } from '@/core/crafting/CraftManager';
+import type { LLMManager } from '@/llm/LLMManager';
 
 /**
  * 上下文管理器
@@ -106,6 +107,7 @@ export class ContextManager {
     movementUtils: MovementUtils;
     craftManager: CraftManager;
     goalManager?: any;
+    llmManager?: LLMManager;
   }): RuntimeContext {
     if (this.context) {
       throw new Error('Context already created. Use getContext() to access existing context.');
@@ -125,6 +127,7 @@ export class ContextManager {
       movementUtils,
       craftManager,
       goalManager,
+      llmManager,
     } = params;
 
     // 初始化 GameState
@@ -148,6 +151,7 @@ export class ContextManager {
       movementUtils,
       craftManager,
       goalManager,
+      llmManager,
     };
 
     return this.context!;

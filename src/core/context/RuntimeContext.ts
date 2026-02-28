@@ -20,6 +20,7 @@ import { MovementUtils } from '@/utils/MovementUtils';
 import { CraftManager } from '@/core/crafting/CraftManager';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
+import type { LLMManager } from '@/llm/LLMManager';
 
 /**
  * Logger 接口
@@ -158,6 +159,9 @@ export interface RuntimeContext {
 
   // 规划管理
   goalManager: any; // GoalManager - 延迟导入避免循环依赖
+
+  // LLM 管理（可选，用于 Action 内部 LLM 调用）
+  llmManager?: LLMManager;
 }
 
 /**

@@ -24,6 +24,11 @@ export * from './OpenFurnaceGUIAction';
 export * from './QueryContainerAction';
 export * from './ManageContainerAction';
 
+// 智能容器交互（Action 内部 LLM 调用）
+export * from './ContainerInteractAction';
+export * from './ChestInteractAction';
+export * from './FurnaceInteractAction';
+
 // 生存相关
 export * from './EatAction';
 export * from './TossItemAction';

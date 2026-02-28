@@ -33,6 +33,10 @@ export const ActionIds = {
   QUERY_CONTAINER: 'query_container', // GUI模式内查询容器
   MANAGE_CONTAINER: 'manage_container', // GUI模式内管理容器
 
+  // 智能容器交互（Action 内部 LLM 调用）
+  INTERACT_CHEST: 'interact_chest', // 智能箱子交互
+  INTERACT_FURNACE: 'interact_furnace', // 智能熔炉交互
+
   // 生存
   EAT: 'eat',
   TOSS_ITEM: 'toss_item',

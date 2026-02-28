@@ -73,25 +73,27 @@ const items = context.gameState.inventory;
 
 **Maicraft Python**: 25+ 个动作（含查询类）
 
-**Maicraft-Next**: **15 个核心动作**
+**Maicraft-Next**: **17 个核心动作**
 
-| 类别           | 动作                     | 说明                 |
-| -------------- | ------------------------ | -------------------- |
-| **移动和探索** | `move`                   | 移动到指定坐标       |
-|                | `find_block`             | 搜索附近方块         |
-| **挖掘**       | `mine_block`             | 挖掘指定类型的方块   |
-|                | `mine_block_by_position` | 挖掘指定位置的方块   |
-|                | `mine_in_direction`      | 向指定方向挖掘       |
-| **建造和合成** | `place_block`            | 放置方块             |
-|                | `craft`                  | 合成物品             |
-| **容器操作**   | `use_chest`              | 使用箱子（存取物品） |
-|                | `use_furnace`            | 使用熔炉（冶炼物品） |
-| **生存**       | `eat`                    | 吃食物恢复饥饿度     |
-|                | `toss_item`              | 丢弃物品             |
-|                | `kill_mob`               | 击杀生物             |
-| **地标和交流** | `set_location`           | 设置/更新/删除地标   |
-|                | `chat`                   | 发送聊天消息         |
-|                | `swim_to_land`           | 游到陆地（防溺水）   |
+| 类别             | 动作                     | 说明                                  |
+| ---------------- | ------------------------ | ------------------------------------- |
+| **移动和探索**   | `move`                   | 移动到指定坐标                        |
+|                  | `find_block`             | 搜索附近方块                          |
+| **挖掘**         | `mine_block`             | 挖掘指定类型的方块                    |
+|                  | `mine_block_by_position` | 挖掘指定位置的方块                    |
+|                  | `mine_in_direction`      | 向指定方向挖掘                        |
+| **建造和合成**   | `place_block`            | 放置方块                              |
+|                  | `craft`                  | 合成物品                              |
+| **智能容器交互** | `interact_chest`         | 智能箱子交互（内部 LLM 决策批量操作） |
+|                  | `interact_furnace`       | 智能熔炉交互（内部 LLM 决策批量操作） |
+| **传统容器操作** | `use_chest`              | 使用箱子（传统单次操作）              |
+|                  | `use_furnace`            | 使用熔炉（传统单次操作）              |
+| **生存**         | `eat`                    | 吃食物恢复饥饿度                      |
+|                  | `toss_item`              | 丢弃物品                              |
+|                  | `kill_mob`               | 击杀生物                              |
+| **地标和交流**   | `set_location`           | 设置/更新/删除地标                    |
+|                  | `chat`                   | 发送聊天消息                          |
+|                  | `swim_to_land`           | 游到陆地（防溺水）                    |
 
 ### 3. 类型安全的动作调用
 
@@ -342,6 +344,7 @@ interface RuntimeContext {
   interruptSignal: InterruptSignal; // 中断信号
   logger: Logger; // 带前缀的日志记录器
   config: Config; // 配置对象
+  llmManager?: LLMManager; // LLM 管理器（可选，用于 Action 内部 LLM 调用）
 }
 ```
 
@@ -516,7 +519,7 @@ await executor.execute(ActionIds.CRAFT, {
 
 ### 容器操作
 
-#### `use_chest` - 使用箱子
+#### `use_chest` - 使用箱子（传统）
 
 ```typescript
 await executor.execute(ActionIds.USE_CHEST, {
@@ -528,7 +531,7 @@ await executor.execute(ActionIds.USE_CHEST, {
 });
 ```
 
-#### `use_furnace` - 使用熔炉
+#### `use_furnace` - 使用熔炉（传统）
 
 ```typescript
 await executor.execute(ActionIds.USE_FURNACE, {
@@ -539,6 +542,61 @@ await executor.execute(ActionIds.USE_FURNACE, {
   fuel: { name: 'coal', count: 5 },
 });
 ```
+
+### 智能容器交互（推荐）
+
+#### `interact_chest` - 智能箱子交互
+
+使用内部 LLM 进行批量存取操作，一次性完成多个物品的整理。
+
+```typescript
+await executor.execute(ActionIds.INTERACT_CHEST, {
+  x: 100,
+  y: 64,
+  z: 200,
+  intent: '整理库存，取出铁锭用于制作工具', // 可选，描述操作意图
+});
+```
+
+**特点**：
+
+- **内部 LLM 决策**：外层 ReAct 循环决定"做什么"，内层 LLM 决定"怎么做"
+- **批量操作**：一次调用可执行多个存取操作
+- **智能整理**：LLM 根据容器内容和背包情况自动决定最优操作
+- **Diff 摘要**：返回操作前后的变化摘要
+
+**性能对比**：
+| 方式 | 5 个操作耗时 |
+| --- | --- |
+| 传统方式（5 次 ReAct） | 15-25 秒 |
+| 智能交互（1 次 ReAct + 内部 LLM） | 5-7 秒 |
+
+#### `interact_furnace` - 智能熔炉交互
+
+使用内部 LLM 进行批量冶炼操作。
+
+```typescript
+await executor.execute(ActionIds.INTERACT_FURNACE, {
+  x: 100,
+  y: 64,
+  z: 200,
+  intent: '熔炼铁矿石，补充燃料并取出产物', // 可选
+});
+```
+
+**支持的操作**：
+
+- `put_items` + `slot: input` - 放入输入槽
+- `put_items` + `slot: fuel` - 放入燃料槽
+- `take_items` + `slot: output` - 取出输出槽
+- `take_items` + `slot: input` - 取出输入槽
+- `take_items` + `slot: fuel` - 取出燃料槽
+
+**支持的熔炉类型**：
+
+- 普通熔炉 (furnace)
+- 高炉 (blast_furnace)
+- 烟熏炉 (smoker)
 
 ### 生存
 
@@ -673,6 +731,82 @@ executor.getEventEmitter().on('actionError', data => {
 });
 ```
 
+### 4. 智能容器交互架构
+
+#### Action 内部 LLM 调用模式
+
+智能容器交互动作（`interact_chest`、`interact_furnace`）采用"Action 内部 LLM 调用"模式：
+
+```
+外层 ReAct 循环 (主 LLM)     内层专用 LLM
+        │                           │
+        │  决定 "做什么"              │  决定 "怎么做"
+        │  (是否操作容器)            │  (具体存取哪些物品)
+        │                           │
+        └─────────→ Action ──────────┘
+                    │
+                    ├── 构建专用 prompt (容器状态 + 背包 + 意图)
+                    │
+                    ├── context.llmManager.simpleChat(prompt)
+                    │
+                    ├── 解析 JSON 响应
+                    │
+                    └── 批量执行操作
+```
+
+**架构优势**：
+
+- 不破坏 ReAct 原则：外层决定"做什么"，内层决定"怎么做"
+- 无需改动 AgentLoop、ToolRegistry、InterruptSystem
+- 对外层来说，Interact Action 只是一个"执行时间较长的工具"
+
+**性能对比**：
+
+| 方式                              | 5 个操作耗时 |
+| --------------------------------- | ------------ |
+| 传统方式（5 次 ReAct 循环）       | 15-25 秒     |
+| 智能交互（1 次 ReAct + 内部 LLM） | 5-7 秒       |
+
+**实现要点**：
+
+```typescript
+abstract class ContainerInteractAction extends BaseAction {
+  abstract getContainerType(): string; // "chest" | "furnace"
+  abstract getPromptTemplateName(): string; // "chest_operation"
+  abstract readContainerState(container): string;
+  abstract executeOperation(ctx, container, op): Promise<OpResult>;
+
+  async execute(context, params) {
+    // 1. 移动到容器 + 打开容器
+    // 2. 读取容器状态
+    const containerState = this.readContainerState(container);
+
+    // 3. 生成专用 prompt
+    const prompt = this.generatePrompt(context, {
+      containerState,
+      inventoryInfo: this.getInventoryInfo(context),
+      intent: params.intent,
+    });
+
+    // 4. 内部 LLM 调用
+    const llmResponse = await context.llmManager.simpleChat(prompt, systemPrompt);
+
+    // 5. 解析 JSON 并批量执行
+    const operations = this.parseOperations(llmResponse);
+    for (const op of operations) {
+      // 检查中断信号
+      if (context.interruptSignal?.isInterrupted?.()) break;
+
+      await this.executeOperation(context, container, op);
+      await sleep(300); // 操作间隔
+    }
+
+    // 6. 计算 diff 摘要并返回
+    return this.success(this.formatDiffSummary(diff));
+  }
+}
+```
+
 ---
 
 ## 📚 相关文档
@@ -683,4 +817,4 @@ executor.getEventEmitter().on('actionError', data => {
 
 ---
 
-_最后更新: 2025-11-01_
+_最后更新: 2026-02-28_

@@ -403,6 +403,8 @@ function registerActions(executor: any, logger: Logger): void {
     OpenFurnaceGUIAction,
     QueryContainerAction,
     ManageContainerAction,
+    ChestInteractAction,
+    FurnaceInteractAction,
     EatAction,
     TossItemAction,
     KillMobAction,
@@ -436,6 +438,10 @@ function registerActions(executor: any, logger: Logger): void {
     new OpenFurnaceGUIAction(),
     new QueryContainerAction(),
     new ManageContainerAction(),
+
+    // 智能容器交互（Action 内部 LLM 调用）
+    new ChestInteractAction(),
+    new FurnaceInteractAction(),
 
     // 生存相关
     new EatAction(),

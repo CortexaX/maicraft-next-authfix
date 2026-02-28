@@ -9,14 +9,17 @@ import { PromptTemplate, promptManager } from '@/core/agent/prompt/prompt_manage
 
 const furnaceOperationTemplateContent = `你是{bot_name}，游戏名叫{player_name}，你正在游玩Minecraft，是一名Minecraft玩家。
 
-# 上下文信息
-{context_info}
+# 操作意图
+{intent}
 
 {current_goal}
 {current_tasks}
 
 # 当前熔炉信息
 {furnace_gui}
+
+# 你的背包内容
+{inventory_info}
 
 # 你的任务
 你正在操作一个熔炉，需要进行物品的存取操作来完成任务。
@@ -167,10 +170,11 @@ export function initFurnaceOperationTemplate(): void {
     new PromptTemplate('furnace_operation', furnaceOperationTemplateContent, '熔炉操作提示词模板', [
       'bot_name',
       'player_name',
-      'furnace_gui',
-      'context_info',
+      'intent',
       'current_goal',
       'current_tasks',
+      'furnace_gui',
+      'inventory_info',
     ]),
   );
 

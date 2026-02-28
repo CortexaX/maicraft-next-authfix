@@ -54,6 +54,22 @@ const prompt = promptManager.generateMainThinking(context, {
 
 评估任务完成度的 Prompt 模板。
 
+### 5. chest_operation - 箱子操作
+
+智能箱子交互使用的 Prompt 模板。
+
+- **用途**：`interact_chest` Action 内部 LLM 调用
+- **参数**：`bot_name`, `player_name`, `intent`, `current_goal`, `current_tasks`, `chest_gui`, `inventory_info`
+- **返回**：JSON 格式的批量操作序列
+
+### 6. furnace_operation - 熔炉操作
+
+智能熔炉交互使用的 Prompt 模板。
+
+- **用途**：`interact_furnace` Action 内部 LLM 调用
+- **参数**：`bot_name`, `player_name`, `intent`, `current_goal`, `current_tasks`, `furnace_gui`, `inventory_info`
+- **返回**：JSON 格式的批量操作序列（支持 input/fuel/output 三个槽位）
+
 ---
 
 ## 💻 基本使用
@@ -134,4 +150,4 @@ const recentMemories = await memory.thought.query({ limit: 5 });
 
 ---
 
-_最后更新: 2025-11-01_
+_最后更新: 2026-02-28_
