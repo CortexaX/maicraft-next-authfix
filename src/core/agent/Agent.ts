@@ -129,16 +129,15 @@ export class Agent {
       // 初始化记忆系统
       await this.state.memory.initialize();
 
-      // 加载目标和任务持久化数据
-      if (this.state.context.goalManager && this.state.context.taskManager) {
+      // 加载目标持久化数据
+      if (this.state.context.goalManager) {
         const context = this.executor.getContextManager().getContext();
         const { TrackerFactory } = await import('@/core/agent/planning/trackers/TrackerFactory');
         const trackerFactory = new TrackerFactory(context.events);
 
         await this.state.context.goalManager.load('./data', trackerFactory);
-        await this.state.context.taskManager.load('./data', trackerFactory);
 
-        this.logger.info('✅ 目标和任务数据加载完成');
+        this.logger.info('✅ 目标数据加载完成');
       }
 
       // 如果配置中有初始目标且当前无活动目标，创建初始目标
@@ -290,7 +289,6 @@ export class Agent {
         this.state.context.containerCache.save(),
         this.state.context.locationManager.save(),
         this.state.context.goalManager?.save?.('./data'),
-        this.state.context.taskManager?.save?.('./data'),
       ]);
 
       this.logger.info('✅ Agent 状态保存完成');
