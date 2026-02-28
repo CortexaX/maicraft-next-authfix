@@ -124,12 +124,11 @@ export class AgentLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 检查目标和任务完成
+   * 检查目标完成
    */
   private async checkGoalAndTaskCompletion(): Promise<void> {
     try {
       const goalManager = this.state.context.goalManager;
-      const taskManager = this.state.context.taskManager;
       const gameContext = {
         gameState: this.state.context.gameState,
       } as any;
@@ -137,11 +136,8 @@ export class AgentLoop extends BaseLoop<AgentState> {
       if (goalManager) {
         goalManager.checkCompletion(gameContext);
       }
-      if (taskManager) {
-        taskManager.checkCompletion(gameContext);
-      }
     } catch (error) {
-      this.logger.error('❌ 目标/任务检测失败', undefined, error as Error);
+      this.logger.error('❌ 目标检测失败', undefined, error as Error);
     }
   }
 
