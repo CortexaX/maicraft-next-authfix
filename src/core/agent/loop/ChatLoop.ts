@@ -220,19 +220,17 @@ export class ChatLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 从 TaskManager/GoalManager 动态读取当前活动
+   * 从 GoalManager 动态读取当前活动
    */
   private getCurrentActivity(): string {
     const goalManager = this.state.context.goalManager;
-    const taskManager = this.state.context.taskManager;
     const currentGoal = goalManager?.getCurrentGoal();
     if (!currentGoal) return '无特定目标，自由探索中';
 
-    const activeTasks = taskManager?.getActiveTasks(currentGoal.id) || [];
-    const inProgress = activeTasks.find((t: any) => t.status === 'in_progress');
-    if (inProgress) return `正在执行: ${inProgress.content}（目标: ${currentGoal.content}）`;
-    if (activeTasks.length > 0) return `计划中: ${activeTasks[0].content}（目标: ${currentGoal.content}）`;
-    return `目标: ${currentGoal.content}（暂无具体任务）`;
+    if (currentGoal.plan) {
+      return `目标: ${currentGoal.content}（计划: ${currentGoal.plan}）`;
+    }
+    return `目标: ${currentGoal.content}（暂无执行计划）`;
   }
 
   /**
