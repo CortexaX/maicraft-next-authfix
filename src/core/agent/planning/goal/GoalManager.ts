@@ -3,8 +3,7 @@
  * 负责目标的增删改查、自动检测、格式化显示
  */
 
-import type { Goal, GoalStatus, GoalCompletedBy, CreateGoalParams, UpdateGoalParams } from './Goal';
-import type { Tracker } from '../trackers/types';
+import type { Goal, GoalCompletedBy, CreateGoalParams, UpdateGoalParams } from './Goal';
 import { logger } from '@/utils/Logger';
 import * as fs from 'fs/promises';
 import * as path from 'path';
@@ -32,6 +31,7 @@ export class GoalManager {
     const goal: Goal = {
       id: uniqueId,
       content: params.content,
+      plan: params.plan,
       tracker: params.tracker,
       status: 'active',
       priority: params.priority ?? 3,
@@ -57,6 +57,9 @@ export class GoalManager {
 
     if (updates.content !== undefined) {
       goal.content = updates.content;
+    }
+    if (updates.plan !== undefined) {
+      goal.plan = updates.plan;
     }
     if (updates.tracker !== undefined) {
       goal.tracker = updates.tracker;
@@ -201,9 +204,22 @@ export class GoalManager {
       }
 
       lines.push(line);
+
+      // 显示计划（如果有）
+      if (goal.plan) {
+        lines.push(`  📋 计划: ${goal.plan}`);
+      }
     }
 
     return lines.join('\n');
+  }
+
+  /**
+   * 更新目标的计划
+   */
+  updatePlan(id: string, plan: string): void {
+    this.updateGoal(id, { plan });
+    logger.info(`[GoalManager] 更新目标计划: ${id}`);
   }
 
   /**
