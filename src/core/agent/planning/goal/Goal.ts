@@ -26,6 +26,9 @@ export interface Goal {
   /** 目标描述 */
   content: string;
 
+  /** 执行计划（自然语言描述的执行步骤） */
+  plan?: string;
+
   /** 可选的自动检测Tracker */
   tracker?: Tracker;
 
@@ -55,6 +58,7 @@ export interface CreateGoalParams {
   /** LLM传入的语义化ID，可选 */
   id?: string;
   content: string;
+  plan?: string;
   tracker?: Tracker;
   priority?: number;
   metadata?: Record<string, any>;
@@ -65,6 +69,7 @@ export interface CreateGoalParams {
  */
 export interface UpdateGoalParams {
   content?: string;
+  plan?: string;
   tracker?: Tracker;
   priority?: number;
   metadata?: Record<string, any>;
