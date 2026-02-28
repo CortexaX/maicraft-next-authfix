@@ -4,6 +4,7 @@
 
 import { getLogger } from '@/utils/Logger';
 import type { Logger } from '@/utils/Logger';
+import type { AppConfig } from '@/utils/Config';
 import { ThoughtMemory } from './ThoughtMemory';
 import { ConversationMemory } from './ConversationMemory';
 import { DecisionMemory } from './DecisionMemory';
@@ -17,20 +18,36 @@ export class MemoryManager {
   private decisions: DecisionMemory;
   private experiences: ExperienceMemory;
 
-  // 可扩展：添加新的记忆类型
   private customMemories: Map<string, MemoryStore<any>> = new Map();
 
   private logger: Logger;
-  private webSocketServer?: any; // WebSocket服务器引用
-  private botConfig?: any; // 机器人配置
-  private maiBotClient?: MaiBotClient; // MaiBot 客户端
+  private webSocketServer?: any;
+  private config: AppConfig;
+  private maiBotClient?: MaiBotClient;
 
-  constructor() {
-    this.logger = getLogger('MemoryManager');
+  constructor(config: AppConfig, logger?: Logger, maiBotClient?: MaiBotClient) {
+    this.config = config;
+    this.logger = logger ?? getLogger('MemoryManager');
+    this.maiBotClient = maiBotClient;
+
     this.thoughts = new ThoughtMemory();
     this.conversations = new ConversationMemory();
     this.decisions = new DecisionMemory();
     this.experiences = new ExperienceMemory();
+
+    if (maiBotClient) {
+      this.setupMaiBotCallback(maiBotClient);
+    }
+  }
+
+  private setupMaiBotCallback(client: MaiBotClient): void {
+    client.setOnReplyCallback((reply: string) => {
+      this.recordThought(`[MaiBot回复] ${reply}`, {
+        source: 'maibot',
+        type: 'reply',
+      });
+    });
+    this.logger.info('🤖 MaiBot 客户端已连接到记忆管理器');
   }
 
   /**
@@ -56,33 +73,6 @@ export class MemoryManager {
     });
   }
 
-  /**
-   * 设置机器人配置，用于格式化对话
-   */
-  setBotConfig(config: any): void {
-    this.botConfig = config;
-  }
-
-  /**
-   * 设置 MaiBot 客户端（由依赖注入系统调用）
-   */
-  setMaiBotClient(client: MaiBotClient): void {
-    this.maiBotClient = client;
-
-    // 设置回复回调：将 MaiBot 的回复添加到思考记忆中
-    client.setOnReplyCallback((reply: string) => {
-      this.recordThought(`[MaiBot回复] ${reply}`, {
-        source: 'maibot',
-        type: 'reply',
-      });
-    });
-
-    this.logger.info('🤖 MaiBot 客户端已连接到记忆管理器');
-  }
-
-  /**
-   * 获取 MaiBot 客户端
-   */
   getMaiBotClient(): MaiBotClient | undefined {
     return this.maiBotClient;
   }
@@ -388,8 +378,7 @@ export class MemoryManager {
   }
 
   private formatConversation(c: ConversationEntry): string {
-    // 如果是AI的消息，显示为 [我]，否则显示具体的用户名
-    const botName = this.botConfig?.minecraft?.username || this.botConfig?.playerName || '麦麦';
+    const botName = this.config.minecraft.username || '麦麦';
     const speaker = c.speaker === botName ? '[我]' : c.speaker;
     return `${this.formatTime(c.timestamp)} ${speaker}: ${c.message}`;
   }
