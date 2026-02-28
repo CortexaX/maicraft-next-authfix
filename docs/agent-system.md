@@ -22,7 +22,7 @@ Agent (主协调器)
   ├── AgentState (共享状态)
   │   ├── RuntimeContext (运行时上下文)
   │   ├── MemoryManager (记忆管理)
-  │   ├── GoalPlanningManager (规划管理)
+  │   ├── GoalManager (目标管理)
   │   ├── InterruptSystem (中断系统)
   │   └── ToolRegistry (工具注册表)
   │

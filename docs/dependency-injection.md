@@ -549,7 +549,7 @@ testContainer.registerInstance(ServiceKeys.Logger, mockLogger); // 用假日志�
 
 // 其他组件保持真实（因为我们只想测Agent）
 testContainer.registerSingleton(ServiceKeys.MemoryManager, c => realMemoryManager);
-testContainer.registerSingleton(ServiceKeys.GoalPlanningManager, c => realPlanningManager);
+testContainer.registerSingleton(ServiceKeys.GoalManager, c => realGoalManager);
 
 // 测试Agent（它会自动使用假机器人和假日志）
 const agent = await testContainer.resolveAsync<Agent>(ServiceKeys.Agent);
@@ -567,9 +567,9 @@ expect(mockBot.chat).toHaveBeenCalledWith('Hello World!');
 const realBot = createBot(); // 需要真的Minecraft服务器
 const realLogger = createLogger(); // 需要真的文件系统
 const realMemory = new MemoryManager();
-const realPlanning = new GoalPlanningManager();
+const realGoalManager = new GoalManager();
 
-const agent = new Agent(realBot, realLogger, realMemory, realPlanning);
+const agent = new Agent(realBot, realLogger, realMemory, realGoalManager);
 // 测试... 但会真的连服务器、写日志文件！
 ```
 
@@ -597,7 +597,7 @@ const agent = await testContainer.resolveAsync<Agent>(ServiceKeys.Agent);
 class Agent {
   constructor(
     private memory: MemoryManager,
-    private planning: GoalPlanningManager,
+    private goalManager: GoalManager,
     private modeManager: ModeManager,
   ) {
     // 直接使用依赖
@@ -607,11 +607,11 @@ class Agent {
 
 // bootstrap.ts - 容器负责组装
 container.registerSingleton(ServiceKeys.Agent, c => {
-  return new Agent(c.resolve(ServiceKeys.MemoryManager), c.resolve(ServiceKeys.GoalPlanningManager), c.resolve(ServiceKeys.ModeManager));
+  return new Agent(c.resolve(ServiceKeys.MemoryManager), c.resolve(ServiceKeys.GoalManager), c.resolve(ServiceKeys.ModeManager));
 });
 
 // 测试中 - 简单直接
-const agent = new Agent(mockMemory, mockPlanning, mockModeManager);
+const agent = new Agent(mockMemory, mockGoalManager, mockModeManager);
 ```
 
 **优点**：
@@ -630,7 +630,7 @@ const agent = new Agent(mockMemory, mockPlanning, mockModeManager);
 class Agent {
   constructor(private container: Container) {
     this.memory = container.resolve(ServiceKeys.MemoryManager);
-    this.planning = container.resolve(ServiceKeys.GoalPlanningManager);
+    this.goalManager = container.resolve(ServiceKeys.GoalManager);
   }
 }
 ```

@@ -150,7 +150,7 @@ await executor.execute(ActionIds.MINE_BLOCK, {
 1. **Agent** - 主协调器，管理所有子系统
 2. **ActionExecutor** - 动作执行，连接到 bot
 3. **MemoryManager** - 记忆管理
-4. **GoalPlanningManager** - 目标和任务规划
+4. **GoalManager** - 目标管理（plan 文本字段 + Tracker 自动检测）
 5. **InterruptSystem** - 中断系统（战斗等被动响应）
 6. **ToolRegistry** - 工具注册表（Action 转 function-calling）
 7. **GameState** - 游戏状态同步

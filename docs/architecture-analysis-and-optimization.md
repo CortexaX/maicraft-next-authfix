@@ -697,7 +697,7 @@ class SomeClass {
 │          AI 代理层 (Agent Layer)                 │
 │  - Agent                                        │
 │  - MainDecisionLoop, ChatLoop                   │
-│  - MemoryManager, GoalPlanningManager           │
+│  - MemoryManager, GoalManager                   │
 │  - ModeManager                                  │
 └─────────────────────────────────────────────────┘
                         ↓
