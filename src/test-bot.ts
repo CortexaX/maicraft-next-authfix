@@ -240,36 +240,77 @@ class MaicraftTestBot {
   private async initializeCore() {
     logger.info('初始化核心系统...');
 
-    // 1. 初始化插件设置
     this.initializePluginSettings();
 
-    // 2. 创建工具类实例
     const movementUtils = new MovementUtils(logger);
     const placeBlockUtils = new PlaceBlockUtils(logger, movementUtils);
 
-    // 3. 创建上下文管理器（这会自动创建和初始化 GameState）
-    this.contextManager = new ContextManager();
-    this.contextManager.createContext({
+    const blockCache = new BlockCache({
+      maxEntries: 0,
+      expirationTime: 0,
+      autoSaveInterval: 0,
+      enabled: true,
+      updateStrategy: 'smart' as const,
+      onlyVisibleBlocks: true,
+    });
+
+    const containerCache = new ContainerCache({
+      maxEntries: 0,
+      expirationTime: 0,
+      autoSaveInterval: 0,
+      enabled: true,
+      updateStrategy: 'smart' as const,
+    });
+
+    const locationManager = new LocationManager();
+    const interruptSignal = new (await import('./core/interrupt/InterruptSignal')).InterruptSignal();
+
+    const { CacheManager } = await import('./core/cache/CacheManager');
+    const cacheManager = new CacheManager(this.bot, blockCache, containerCache, {
+      blockScanInterval: 5000,
+      blockScanRadius: 50,
+      containerUpdateInterval: 10000,
+      autoSaveInterval: 60000,
+      enablePeriodicScan: false,
+      enableAutoSave: false,
+      performanceMode: 'balanced' as const,
+    });
+
+    const { NearbyBlockManager } = await import('./core/cache/NearbyBlockManager');
+    const nearbyBlockManager = new NearbyBlockManager(blockCache, this.bot);
+
+    const { GameState } = await import('./core/state/GameState');
+    const gameState = new GameState({
+      blockCache,
+      containerCache,
+      cacheManager,
+      nearbyBlockManager,
+    });
+
+    this.contextManager = new ContextManager({
       bot: this.bot,
-      executor: null as any, // 先传 null，稍后注入真正的 executor
       config: {},
       logger,
+      gameState,
+      blockCache,
+      containerCache,
+      locationManager,
+      interruptSignal,
       placeBlockUtils,
       movementUtils,
+      craftManager: undefined as any,
     });
-    logger.info('✅ ContextManager 和 GameState 初始化完成');
+    logger.info('✅ ContextManager 初始化完成');
 
-    // 4. 创建 ActionExecutor
+    gameState.initialize(this.bot);
+    logger.info('✅ GameState 初始化完成');
+
     this.executor = new ActionExecutor(this.contextManager, logger);
-
-    // 更新 ContextManager 中的 executor 引用
     this.contextManager.updateExecutor(this.executor);
     logger.info('✅ ActionExecutor 创建完成');
 
-    // 5. 注册所有动作
     this.registerActions();
 
-    // 6. 设置事件监听
     const events = this.executor.getEventManager();
 
     events.on('actionComplete', data => {
@@ -360,7 +401,7 @@ class MaicraftTestBot {
   /**
    * 处理命令
    */
-  private async handleCommand(command: string, args: string[], username: string) {
+  private async handleCommand(command: string, args: string[], _username: string) {
     switch (command) {
       case 'help':
         this.bot.chat('可用命令:');
@@ -379,11 +420,12 @@ class MaicraftTestBot {
         this.bot.chat('!chest_test <x> <y> <z> - 完整测试流程');
         break;
 
-      case 'status':
+      case 'status': {
         const gameState = this.contextManager.getContext().gameState;
         this.bot.chat(`生命: ${gameState.health}/20, 饥饿: ${gameState.food}/20`);
         this.bot.chat(`等级: ${gameState.level}, 经验: ${gameState.experience}`);
         break;
+      }
       case 'chat':
         if (args.length < 1) {
           this.bot.chat('用法: !chat <message>');
@@ -394,10 +436,11 @@ class MaicraftTestBot {
         });
         break;
 
-      case 'pos':
+      case 'pos': {
         const pos = this.contextManager.getContext().gameState.blockPosition;
         this.bot.chat(`位置: (${pos.x}, ${pos.y}, ${pos.z})`);
         break;
+      }
 
       case 'move':
         if (args.length < 3) {
@@ -444,13 +487,14 @@ class MaicraftTestBot {
         });
         break;
 
-      case 'actions':
+      case 'actions': {
         const actions = this.executor.getRegisteredActions();
         this.bot.chat(`已注册 ${actions.length} 个动作:`);
         actions.forEach(action => {
           this.bot.chat(`- ${action.id}: ${action.description}`);
         });
         break;
+      }
 
       case 'chest_query':
         if (args.length < 3) {

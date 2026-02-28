@@ -1,14 +1,3 @@
-/**
- * Maicraft-Next Main Entry Point
- *
- * 集成完整的AI代理系统，包括：
- * - 核心基础设施（GameState, ActionExecutor, EventManager）
- * - AI代理系统（Agent, Memory, Planning, Mode, Loops）
- * - LLM集成
- * - 配置管理
- * - 日志系统
- */
-
 import { createBot, Bot } from 'mineflayer';
 import { pathfinder, Movements } from 'mineflayer-pathfinder-mai';
 import armorManager from 'mineflayer-armor-manager';
@@ -16,34 +5,23 @@ import { plugin as pvpPlugin } from 'mineflayer-pvp';
 import { plugin as toolPlugin } from 'mineflayer-tool';
 import { plugin as collectBlock } from 'mineflayer-collectblock-colalab';
 
-// Node.js 模块
 import * as fs from 'fs';
 import * as path from 'path';
 
-// 依赖注入
-import { Container, ServiceKeys, configureServices } from '@/core/di';
-import type { Agent } from '@/core/agent/Agent';
-import type { WebSocketServer } from '@/api/WebSocketServer';
+import { createServices, initializeServices, disposeServices, type AppServices } from '@/core/di';
 
-// 工具类
 import { type AppConfig } from '@/utils/Config';
 import { createLogger, LogLevel, type Logger } from '@/utils/Logger';
 import { ConfigLoader } from '@/utils/Config';
 
-/**
- * 基础错误日志记录器（在配置加载前使用）
- */
 const basicErrorLogger: Logger = createLogger({
   level: LogLevel.INFO,
   console: true,
   file: false,
 });
 
-/**
- * 主应用程序类
- */
 class MaicraftNext {
-  private container!: Container;
+  private services?: AppServices;
   private bot?: Bot;
   private config?: AppConfig;
   private logger: Logger = createLogger();
@@ -52,44 +30,26 @@ class MaicraftNext {
   private reconnectTimer?: NodeJS.Timeout;
   private reconnectAttempts = 0;
 
-  /**
-   * 初始化应用程序
-   */
   async initialize(): Promise<void> {
     try {
-      // 1. 使用 ConfigLoader 加载配置
       const configLoader = new ConfigLoader();
       this.config = await configLoader.loadDefaultConfig();
 
       this.logger.info('🚀 Maicraft-Next 正在启动...');
       this.logger.info(`版本: ${this.config!.app.version}`);
 
-      // 2. 创建 DI 容器
-      this.container = new Container(this.logger);
-
-      // 3. 连接到Minecraft服务器
       await this.connectToMinecraft();
 
-      // 4. 注册基础服务到容器
-      this.container.registerInstance(ServiceKeys.Config, this.config!);
-      this.container.registerInstance(ServiceKeys.Logger, this.logger);
-      this.container.registerInstance(ServiceKeys.Bot, this.bot!);
+      this.services = createServices(this.bot!, this.config!, this.logger);
 
-      // 5. 配置所有其他服务
-      configureServices(this.container);
-
-      // 6. 初始化插件设置
       this.initializePluginSettings();
 
-      // 7. 启动 WebSocket 服务器和 Agent
-      const wsServer = await this.container.resolveAsync<WebSocketServer>(ServiceKeys.WebSocketServer);
-      const agent = await this.container.resolveAsync<Agent>(ServiceKeys.Agent);
+      await initializeServices(this.services, this.bot!, this.logger);
 
-      // 连接 Agent 和 WebSocket 服务器
-      agent.setWebSocketServer(wsServer);
-      wsServer.setMemoryManager(agent.getMemoryManager());
+      this.services.agent.setWebSocketServer(this.services.wsServer);
+      this.services.wsServer.setMemoryManager(this.services.agent.getMemoryManager());
 
-      await agent.start();
+      await this.services.agent.start();
       this.logger.info('✅ Agent已启动');
 
       this.logger.info('✅ Maicraft-Next 启动完成');
@@ -100,16 +60,10 @@ class MaicraftNext {
     }
   }
 
-  /**
-   * 获取WebSocket服务器实例
-   */
-  getWebSocketServer(): WebSocketServer | undefined {
-    return this.container?.resolve<WebSocketServer>(ServiceKeys.WebSocketServer);
+  getWebSocketServer() {
+    return this.services?.wsServer;
   }
 
-  /**
-   * 连接到Minecraft服务器
-   */
   private async connectToMinecraft(): Promise<void> {
     if (!this.config || !this.logger) {
       throw new Error('配置或日志系统未初始化');
@@ -123,7 +77,6 @@ class MaicraftNext {
       username: mcConfig.username,
     });
 
-    // 创建bot
     this.bot = createBot({
       host: mcConfig.host,
       port: mcConfig.port,
@@ -132,66 +85,46 @@ class MaicraftNext {
       auth: mcConfig.auth,
     });
 
-    // 加载插件
     this.loadPlugins();
-
-    // 设置事件监听
     this.setupBotEvents();
 
-    // 等待登录
     await new Promise<void>((resolve, reject) => {
       const timeout = setTimeout(() => {
         reject(new Error('连接超时'));
-      }, mcConfig.timeout);
+      }, this.config!.minecraft.timeout);
 
-      this.bot!.once('spawn', () => {
+      this.bot!.once('login', () => {
         clearTimeout(timeout);
-        this.logger.info('✅ 成功连接到服务器并重生');
-
+        this.logger.info('✅ 已登录到Minecraft服务器');
         resolve();
       });
 
-      this.bot!.once('error', err => {
+      this.bot!.once('error', error => {
         clearTimeout(timeout);
-        reject(err);
+        reject(error);
       });
     });
   }
 
-  /**
-   * 加载Mineflayer插件
-   */
   private loadPlugins(): void {
-    if (!this.bot || !this.logger) {
-      throw new Error('Bot或日志系统未初始化');
-    }
+    if (!this.bot) return;
 
-    // 加载所有必需的mineflayer插件
-
-    // Pathfinder（必需）
     this.bot.loadPlugin(pathfinder);
     this.logger.info('✅ 加载插件: pathfinder');
 
-    // Armor Manager
     this.bot.loadPlugin(armorManager);
     this.logger.info('✅ 加载插件: armor-manager');
 
-    // PvP
     this.bot.loadPlugin(pvpPlugin);
     this.logger.info('✅ 加载插件: pvp');
 
-    // Tool
     this.bot.loadPlugin(toolPlugin);
     this.logger.info('✅ 加载插件: tool');
 
-    // CollectBlock
     this.bot.loadPlugin(collectBlock);
     this.logger.info('✅ 加载插件: collectblock');
   }
 
-  /**
-   * 初始化插件设置
-   */
   private initializePluginSettings(): void {
     if (!this.bot || !this.config) {
       this.logger.error('Bot或配置未初始化');
@@ -199,13 +132,11 @@ class MaicraftNext {
     }
 
     try {
-      // 1. 设置 pathfinder movements
       if (this.bot.pathfinder) {
         const defaultMove = new Movements(this.bot);
 
-        // 设置不能破坏的方块列表
         const blocksCantBreakIds = new Set<number>();
-        const defaultBlocks = ['chest', 'furnace', 'crafting_table', 'bed']; // 默认不能破坏的方块
+        const defaultBlocks = ['chest', 'furnace', 'crafting_table', 'bed'];
         const blockNames = this.config.plugins.pathfinder?.blocks_cant_break || defaultBlocks;
 
         this.logger.info(`配置移动过程中不能破坏的方块列表: ${blockNames.join(', ')}`);
@@ -226,13 +157,11 @@ class MaicraftNext {
         this.logger.info('✅ Pathfinder movements 初始化完成');
       }
 
-      // 2. 设置 collectBlock movements
       if ((this.bot as any).collectBlock && this.bot.pathfinder) {
         (this.bot as any).collectBlock.movements = this.bot.pathfinder.movements;
         this.logger.info('✅ CollectBlock movements 已同步');
       }
 
-      // 3. 装备所有护甲
       if (this.bot.armorManager) {
         this.bot.armorManager.equipAll();
         this.logger.info('✅ ArmorManager 自动装备已启用');
@@ -244,15 +173,11 @@ class MaicraftNext {
     }
   }
 
-  /**
-   * 设置Bot事件监听（仅连接相关）
-   */
   private setupBotEvents(): void {
     if (!this.bot || !this.logger) {
       return;
     }
 
-    // 连接状态事件（main.ts 只负责连接管理，不处理游戏逻辑）
     this.bot.on('error', error => {
       this.logger.error('Bot错误', undefined, error as Error);
     });
@@ -266,13 +191,8 @@ class MaicraftNext {
       this.logger.warn('连接断开', { reason });
       this.handleDisconnect('ended');
     });
-
-    // 游戏事件监听已移至 Agent.ts，由 Agent 统一处理游戏逻辑
   }
 
-  /**
-   * 处理断开连接
-   */
   private handleDisconnect(_reason: string): void {
     if (this.isShuttingDown) {
       return;
@@ -293,7 +213,7 @@ class MaicraftNext {
     }
 
     this.reconnectAttempts++;
-    this.logger.info(`将在 ${mcConfig.reconnect_delay}ms 后尝试重连 (${this.reconnectAttempts}/${mcConfig.max_reconnect_attempts})`);
+    this.logger.info(`尝试重连 (${this.reconnectAttempts}/${mcConfig.max_reconnect_attempts})...`);
 
     this.reconnectTimer = setTimeout(async () => {
       try {
@@ -305,27 +225,40 @@ class MaicraftNext {
     }, mcConfig.reconnect_delay);
   }
 
-  /**
-   * 重新连接
-   */
   private async reconnect(): Promise<void> {
-    this.logger.info('正在重新连接...');
+    this.logger.info('开始重新连接...');
 
-    // 销毁旧容器
-    if (this.container) {
-      await this.container.dispose();
+    if (this.services) {
+      await disposeServices(this.services);
+      this.services = undefined;
     }
 
-    // 重新初始化
-    await this.initialize();
+    if (this.bot) {
+      try {
+        this.bot.quit('Reconnecting');
+      } catch {
+        // ignore
+      }
+      this.bot = undefined;
+    }
+
+    await this.connectToMinecraft();
+
+    this.services = createServices(this.bot!, this.config!, this.logger);
+
+    this.initializePluginSettings();
+
+    await initializeServices(this.services, this.bot!, this.logger);
+
+    this.services.agent.setWebSocketServer(this.services.wsServer);
+    this.services.wsServer.setMemoryManager(this.services.agent.getMemoryManager());
+
+    await this.services.agent.start();
 
     this.reconnectAttempts = 0;
     this.logger.info('✅ 重连成功');
   }
 
-  /**
-   * 优雅关闭
-   */
   async shutdown(): Promise<void> {
     if (this.isShuttingDown) {
       return;
@@ -334,23 +267,20 @@ class MaicraftNext {
     this.isShuttingDown = true;
     this.logger?.info('👋 正在关闭Maicraft-Next...');
 
-    // 清除重连定时器
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = undefined;
     }
 
-    // 1. 销毁容器（会自动调用所有服务的 disposer）
-    if (this.container) {
+    if (this.services) {
       try {
-        await this.container.dispose();
-        this.logger?.info('✅ 容器已销毁');
+        await disposeServices(this.services);
+        this.logger?.info('✅ 服务已销毁');
       } catch (error) {
-        this.logger?.error('销毁容器时出错', undefined, error as Error);
+        this.logger?.error('销毁服务时出错', undefined, error as Error);
       }
     }
 
-    // 2. 断开Bot连接
     if (this.bot) {
       try {
         this.bot.quit('Shutting down');
@@ -362,15 +292,10 @@ class MaicraftNext {
 
     this.logger?.info('✅ Maicraft-Next 已关闭');
 
-    // 等待日志写入完成
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
 }
 
-/**
- * 检查是否是 MaiBot 连接错误
- * MaiBot 连接错误不应该导致应用崩溃
- */
 function isMaiBotConnectionError(error: Error): boolean {
   const errorObj = error as any;
   const isAggregateError = error.name === 'AggregateError';
@@ -380,15 +305,10 @@ function isMaiBotConnectionError(error: Error): boolean {
   return isConnectionError && (isAggregateError && isNetworkStack) !== undefined;
 }
 
-/**
- * 主函数
- */
 async function main(): Promise<void> {
-  // 检查命令行参数
   const args = process.argv.slice(2);
   const cleanData = args.includes('--clean-data');
 
-  // 如果指定了--clean-data参数，先清空data目录
   if (cleanData) {
     const dataDir = path.join(process.cwd(), 'data');
     try {
@@ -407,7 +327,6 @@ async function main(): Promise<void> {
 
   const app = new MaicraftNext();
 
-  // 设置信号处理
   const shutdownHandler = async (_signal: string) => {
     try {
       await app.shutdown();
@@ -421,7 +340,6 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => shutdownHandler('SIGINT'));
   process.on('SIGTERM', () => shutdownHandler('SIGTERM'));
 
-  // 捕获未处理的异常
   process.on('uncaughtException', error => {
     if (isMaiBotConnectionError(error)) {
       basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', { error });
@@ -441,7 +359,6 @@ async function main(): Promise<void> {
     app.shutdown().then(() => process.exit(1));
   });
 
-  // 启动应用
   try {
     await app.initialize();
   } catch (error) {
@@ -451,7 +368,6 @@ async function main(): Promise<void> {
   }
 }
 
-// 启动程序
 if (require.main === module) {
   main().catch(error => {
     basicErrorLogger.error('程序异常', undefined, error as Error);
