@@ -6,7 +6,6 @@
 import { getLogger, type Logger } from '@/utils/Logger';
 import type { AgentState } from '@/core/agent/types';
 import type { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
-import { promptManager } from '@/core/agent/prompt';
 import type { EntityInfo, GameState } from '@/core/state/GameState';
 
 /**
@@ -86,9 +85,8 @@ export class PromptDataCollector {
    * 收集基础信息
    */
   collectBasicInfo(): BaseInfoData {
-    const { gameState, goalManager, taskManager } = this.state.context;
+    const { gameState, goalManager } = this.state.context;
 
-    // 格式化目标和任务
     const gameContext = { gameState } as any;
     const hasGoal = goalManager?.getCurrentGoal();
 
@@ -97,26 +95,23 @@ export class PromptDataCollector {
     let goal_completed_hint: string;
 
     if (!hasGoal) {
-      // 没有目标时，显示强调提示
       current_goal = `⚠️ 当前没有活动目标！
 
-💡 你需要立即使用 plan_action 动作来创建目标和任务：
-1. 首先添加一个目标 (type="goal", operation="add")
+💡 你需要立即使用 plan_action 动作来创建目标：
+1. 使用 operation="add" 添加一个目标
    - 目标应该是抽象的、需要多步骤完成的（如"收集资源"、"探索世界"）
    - 可选择不配置tracker，因为目标较抽象
-2. 然后为目标添加具体的任务 (type="task", operation="add", goalId="目标ID")
-   - 任务应该是具体的、可以用单个动作完成的
-   - 建议配置tracker自动检测完成
+2. 创建目标后，可以使用 operation="update_plan" 来制定执行计划
+   - 计划用自然语言描述执行步骤
 
 示例：
-添加目标：{"type": "goal", "operation": "add", "content": "收集基础资源", "priority": 5}
-添加任务：{"type": "task", "operation": "add", "goalId": "collect_basic_resources", "content": "收集20个橡木原木", "tracker": {"type": "collection", "itemName": "oak_log", "targetCount": 20}}`;
+添加目标：{"operation": "add", "content": "收集基础资源", "priority": 5}
+更新计划：{"operation": "update_plan", "id": "collect_basic_resources", "plan": "1. 寻找附近的树木 2. 收集20个橡木原木 3. 制作工作台"}`;
       task_list = '';
       goal_completed_hint = '';
     } else {
-      // 有目标时，正常显示
       current_goal = goalManager.formatGoals(gameContext);
-      task_list = '\n' + (taskManager?.formatTasks(hasGoal.id, gameContext) || '无任务');
+      task_list = hasGoal.plan ? `\n计划: ${hasGoal.plan}` : '\n计划: 暂无执行计划';
       goal_completed_hint = '';
     }
 
@@ -222,7 +217,7 @@ export class PromptDataCollector {
   }
 
   private formatStatusInfo(gameState: GameState): string {
-    let statusParts = [
+    const statusParts = [
       `生命值: ${gameState.health}/${gameState.healthMax}`,
       `饥饿值: ${gameState.food}/${gameState.foodMax}`,
       `等级: ${gameState.level} (经验: ${gameState.experience}, 升级进度: ${(gameState.experienceProgress * 100).toFixed(1)}%)`,
