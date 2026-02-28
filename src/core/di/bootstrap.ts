@@ -27,6 +27,10 @@ import { CraftManager } from '@/core/crafting/CraftManager';
 import { Agent } from '@/core/agent/Agent';
 import { WebSocketServer } from '@/api/WebSocketServer';
 import { InterruptManager } from '@/core/interrupt';
+import { EventBus } from '@/core/events/EventBus';
+import { MemoryServiceImpl } from '@/core/agent/memory/MemoryServiceImpl';
+import { WebSocketAdapter } from '@/core/agent/memory/integrations/WebSocketAdapter';
+import { MaiBotAdapter } from '@/core/agent/memory/integrations/MaiBotAdapter';
 import {
   ChatAction,
   MoveAction,
@@ -72,6 +76,7 @@ export interface AppServices {
   llmManager: LLMManager;
   maiBotClient?: MaiBotClient;
   memoryManager: MemoryManager;
+  memoryService: MemoryServiceImpl;
   interruptManager: InterruptManager;
   trackerFactory: TrackerFactory;
   configLoader: ConfigLoader;
@@ -153,7 +158,9 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     maiBotClient = new MaiBotClient(config.maibot);
   }
 
-  const memoryManager = new MemoryManager(config, logger, maiBotClient);
+  const eventBus = EventBus.getInstance();
+  const memoryManager = new MemoryManager(config, logger, eventBus);
+  const memoryService = new MemoryServiceImpl(memoryManager, eventBus);
 
   const interruptManager = new InterruptManager(gameState, actionExecutor.getEventManager());
   const trackerFactory = new TrackerFactory(actionExecutor.getEventManager());
@@ -161,7 +168,7 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
   const promptManager = new PromptManager();
   const promptOverrideManager = createPromptOverrideManager(getDefaultOverrideTemplates());
 
-  const agent = new Agent(bot, actionExecutor, llmManager, config, memoryManager, interruptManager, logger);
+  const agent = new Agent(bot, actionExecutor, llmManager, config, memoryService, memoryManager, interruptManager, logger);
 
   const wsServer = new WebSocketServer();
 
@@ -182,6 +189,7 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     llmManager,
     maiBotClient,
     memoryManager,
+    memoryService,
     interruptManager,
     trackerFactory,
     configLoader,
@@ -225,6 +233,16 @@ export async function initializeServices(services: AppServices, bot: Bot, logger
   }
 
   await services.memoryManager.initialize();
+
+  const eventBus = EventBus.getInstance();
+
+  const wsAdapter = new WebSocketAdapter(eventBus, services.wsServer);
+  wsAdapter.initialize();
+
+  if (services.maiBotClient) {
+    const maiBotAdapter = new MaiBotAdapter(eventBus, services.maiBotClient, services.memoryService);
+    maiBotAdapter.initialize();
+  }
 
   await services.agent.initialize();
 

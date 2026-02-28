@@ -3,7 +3,7 @@
  */
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
-import type { MemoryManager } from './memory/MemoryManager';
+import type { MemoryService } from './memory/MemoryService';
 import type { LLMManager } from '@/llm/LLMManager';
 import type { AppConfig as Config } from '@/utils/Config';
 import type { ToolRegistry } from './tool/ToolRegistry';
@@ -24,7 +24,7 @@ export interface AgentState {
 
   readonly context: RuntimeContext;
 
-  readonly memory: MemoryManager;
+  readonly memory: MemoryService;
   readonly llmManager: LLMManager;
 
   readonly interruptManager: InterruptManager;

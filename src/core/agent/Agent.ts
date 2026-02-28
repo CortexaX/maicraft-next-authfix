@@ -13,6 +13,7 @@ import type { Logger } from '@/utils/Logger';
 import type { Bot } from 'mineflayer';
 import type { AppConfig as Config } from '@/utils/Config';
 import type { AgentState, AgentStatus } from './types';
+import type { MemoryService } from './memory/MemoryService';
 import { MemoryManager } from './memory/MemoryManager';
 import { AgentLoop } from './loop/AgentLoop';
 import { ChatLoop } from './loop/ChatLoop';
@@ -43,6 +44,7 @@ export class Agent {
   private bot: Bot;
   private executor: ActionExecutor;
   private llmManager: LLMManager;
+  private memoryManager: MemoryManager;
   private externalLogger: Logger;
 
   // 生命周期
@@ -55,13 +57,15 @@ export class Agent {
     executor: ActionExecutor,
     llmManager: LLMManager,
     config: Config,
-    memory: MemoryManager,
+    memory: MemoryService,
+    memoryManager: MemoryManager,
     interruptManager: InterruptManager,
     logger?: Logger,
   ) {
     this.bot = bot;
     this.executor = executor;
     this.llmManager = llmManager;
+    this.memoryManager = memoryManager;
     this.externalLogger = logger || getLogger('Agent');
     this.logger = this.externalLogger;
 
@@ -99,15 +103,14 @@ export class Agent {
   }
 
   /**
-   * 设置WebSocket服务器（用于记忆推送）
+   * 获取记忆服务
    */
-  setWebSocketServer(webSocketServer: any): void {
-    this.state.memory.setWebSocketServer(webSocketServer);
-    this.logger.info('📡 Agent 已连接到WebSocket服务器');
+  getMemoryService(): MemoryService {
+    return this.state.memory;
   }
 
   /**
-   * 获取记忆管理器
+   * 获取内部记忆管理器（用于需要直接访问的地方）
    */
   getMemoryManager(): any {
     return this.state.memory;
@@ -152,7 +155,7 @@ export class Agent {
       }
 
       // 注册中断处理器（取代模式注册）
-      const combatHandler = new CombatHandler(this.executor, this.state.memory, this.state.context.gameState);
+      const combatHandler = new CombatHandler(this.executor, this.memoryManager, this.state.context.gameState);
       this.interruptManager.register(combatHandler);
       this.logger.info('战斗中断处理器已注册');
 

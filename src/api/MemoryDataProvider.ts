@@ -5,13 +5,11 @@
 
 import { getLogger } from '@/utils/Logger';
 import { WebSocketServer } from './WebSocketServer';
-import { MemoryManager } from '@/core/agent/memory/MemoryManager';
-import type { ThoughtEntry, ConversationEntry, DecisionEntry, ExperienceEntry } from '@/core/agent/memory/types';
 
 export class MemoryDataProvider {
   private logger = getLogger('MemoryDataProvider');
   private server: WebSocketServer;
-  private memoryManager!: MemoryManager;
+  private memoryService!: any;
 
   constructor(server: WebSocketServer) {
     this.server = server;
@@ -20,8 +18,8 @@ export class MemoryDataProvider {
   /**
    * 初始化数据提供器
    */
-  initialize(memoryManager: MemoryManager): void {
-    this.memoryManager = memoryManager;
+  initialize(memoryService: any): void {
+    this.memoryService = memoryService;
     this.logger.info('🧠 记忆数据提供器已初始化');
   }
 
@@ -49,7 +47,7 @@ export class MemoryDataProvider {
     try {
       const { memoryTypes, timeRange, limit, sortBy, filters } = data;
 
-      this.logger.info('🧠 处理记忆查询请求', { clientId, memoryTypes, limit, memoryManagerExists: !!this.memoryManager });
+      this.logger.info('🧠 处理记忆查询请求', { clientId, memoryTypes, limit, memoryManagerExists: !!this.memoryService });
 
       const results: Record<string, any[]> = {};
       let totalEntries = 0;
@@ -115,19 +113,19 @@ export class MemoryDataProvider {
       let success = false;
       switch (memoryType) {
         case 'thought':
-          this.memoryManager.thought.add(newEntry);
+          this.memoryService.internal.thought.add(newEntry);
           success = true;
           break;
         case 'conversation':
-          this.memoryManager.conversation.add(newEntry);
+          this.memoryService.internal.conversation.add(newEntry);
           success = true;
           break;
         case 'decision':
-          this.memoryManager.decision.add(newEntry);
+          this.memoryService.internal.decision.add(newEntry);
           success = true;
           break;
         case 'experience':
-          this.memoryManager.experience.add(newEntry);
+          this.memoryService.internal.experience.add(newEntry);
           success = true;
           break;
       }
@@ -172,11 +170,10 @@ export class MemoryDataProvider {
       }
 
       // 更新记忆
-      const success = this.memoryManager.updateMemory(memoryType, id, updates);
+      const success = this.memoryService.internal.updateMemory(memoryType, id, updates);
 
       if (success) {
-        // 获取更新后的记忆
-        const updatedEntry = this.memoryManager.findMemory(memoryType, id);
+        const updatedEntry = this.memoryService.internal.findMemory(memoryType, id);
 
         // 发送响应
         this.server.sendToConnection(clientId, {
@@ -214,7 +211,7 @@ export class MemoryDataProvider {
       }
 
       // 删除记忆
-      const success = this.memoryManager.deleteMemory(memoryType, id);
+      const success = this.memoryService.internal.deleteMemory(memoryType, id);
 
       if (success) {
         // 发送响应
@@ -291,13 +288,13 @@ export class MemoryDataProvider {
     // 执行查询
     switch (memoryType) {
       case 'thought':
-        return this.memoryManager.thought.query(queryOptions);
+        return this.memoryService.internal.thought.query(queryOptions);
       case 'conversation':
-        return this.memoryManager.conversation.query(queryOptions);
+        return this.memoryService.internal.conversation.query(queryOptions);
       case 'decision':
-        return this.memoryManager.decision.query(queryOptions);
+        return this.memoryService.internal.decision.query(queryOptions);
       case 'experience':
-        return this.memoryManager.experience.query(queryOptions);
+        return this.memoryService.internal.experience.query(queryOptions);
       default:
         return [];
     }

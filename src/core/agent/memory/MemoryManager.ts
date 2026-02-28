@@ -10,7 +10,8 @@ import { ConversationMemory } from './ConversationMemory';
 import { DecisionMemory } from './DecisionMemory';
 import { ExperienceMemory } from './ExperienceMemory';
 import type { MemoryStore, ThoughtEntry, ConversationEntry, DecisionEntry, ExperienceEntry, MemoryStats } from './types';
-import type { MaiBotClient } from '../communication/MaiBotClient';
+import { EventBus } from '@/core/events/EventBus';
+import { MemoryEventTypes } from '@/core/events/types';
 
 export class MemoryManager {
   private thoughts: ThoughtMemory;
@@ -21,33 +22,18 @@ export class MemoryManager {
   private customMemories: Map<string, MemoryStore<any>> = new Map();
 
   private logger: Logger;
-  private webSocketServer?: any;
   private config: AppConfig;
-  private maiBotClient?: MaiBotClient;
+  private eventBus: EventBus;
 
-  constructor(config: AppConfig, logger?: Logger, maiBotClient?: MaiBotClient) {
+  constructor(config: AppConfig, logger?: Logger, eventBus?: EventBus) {
     this.config = config;
     this.logger = logger ?? getLogger('MemoryManager');
-    this.maiBotClient = maiBotClient;
+    this.eventBus = eventBus ?? EventBus.getInstance();
 
     this.thoughts = new ThoughtMemory();
     this.conversations = new ConversationMemory();
     this.decisions = new DecisionMemory();
     this.experiences = new ExperienceMemory();
-
-    if (maiBotClient) {
-      this.setupMaiBotCallback(maiBotClient);
-    }
-  }
-
-  private setupMaiBotCallback(client: MaiBotClient): void {
-    client.setOnReplyCallback((reply: string) => {
-      this.recordThought(`[MaiBot回复] ${reply}`, {
-        source: 'maibot',
-        type: 'reply',
-      });
-    });
-    this.logger.info('🤖 MaiBot 客户端已连接到记忆管理器');
   }
 
   /**
@@ -59,22 +45,6 @@ export class MemoryManager {
     await Promise.all([this.thoughts.initialize(), this.conversations.initialize(), this.decisions.initialize(), this.experiences.initialize()]);
 
     this.logger.info('✅ 记忆系统初始化完成');
-  }
-
-  /**
-   * 设置WebSocket服务器引用，用于推送记忆更新
-   */
-  setWebSocketServer(server: any): void {
-    this.webSocketServer = server;
-    const hasMemoryDataProvider = !!server?.memoryDataProvider;
-    this.logger.info('📡 WebSocket服务器已连接到记忆管理器', {
-      serverExists: !!server,
-      hasMemoryDataProvider,
-    });
-  }
-
-  getMaiBotClient(): MaiBotClient | undefined {
-    return this.maiBotClient;
   }
 
   /**
@@ -104,21 +74,7 @@ export class MemoryManager {
     };
     this.thoughts.add(entry);
 
-    // 推送记忆更新到 WebSocket
-    if (this.webSocketServer) {
-      if (this.webSocketServer.memoryDataProvider) {
-        this.webSocketServer.memoryDataProvider.pushMemory('thought', entry);
-      } else {
-        this.logger.warn('❌ memoryDataProvider 未初始化，无法推送思考记忆');
-      }
-    } else {
-      this.logger.warn('❌ WebSocket服务器未设置，无法推送思考记忆');
-    }
-
-    // 发送给 MaiBot（如果不是来自 MaiBot 的回复）
-    if (this.maiBotClient && context?.source !== 'maibot') {
-      this.maiBotClient.sendThoughtMemory(entry);
-    }
+    this.eventBus.emitMemory(MemoryEventTypes.THOUGHT_RECORDED, { entry });
   }
 
   /**
@@ -135,10 +91,7 @@ export class MemoryManager {
     this.conversations.add(entry);
     this.logger.debug(`💬 记录对话: ${speaker} - ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`);
 
-    // 推送记忆更新
-    if (this.webSocketServer?.memoryDataProvider) {
-      this.webSocketServer.memoryDataProvider.pushMemory('conversation', entry);
-    }
+    this.eventBus.emitMemory(MemoryEventTypes.CONVERSATION_RECORDED, { entry });
   }
 
   /**
@@ -156,15 +109,7 @@ export class MemoryManager {
     this.decisions.add(entry);
     this.logger.debug(`🎯 记录决策: ${result} - ${intention}`);
 
-    // 推送记忆更新到 WebSocket
-    if (this.webSocketServer?.memoryDataProvider) {
-      this.webSocketServer.memoryDataProvider.pushMemory('decision', entry);
-    }
-
-    // 发送给 MaiBot
-    if (this.maiBotClient) {
-      this.maiBotClient.sendDecisionMemory(entry);
-    }
+    this.eventBus.emitMemory(MemoryEventTypes.DECISION_RECORDED, { entry });
   }
 
   /**
@@ -183,10 +128,7 @@ export class MemoryManager {
     this.experiences.add(entry);
     this.logger.debug(`📚 记录经验: ${lesson.substring(0, 50)}${lesson.length > 50 ? '...' : ''} (置信度: ${(confidence * 100).toFixed(0)}%)`);
 
-    // 推送记忆更新
-    if (this.webSocketServer?.memoryDataProvider) {
-      this.webSocketServer.memoryDataProvider.pushMemory('experience', entry);
-    }
+    this.eventBus.emitMemory(MemoryEventTypes.EXPERIENCE_RECORDED, { entry });
   }
 
   /**

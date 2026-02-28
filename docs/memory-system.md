@@ -28,25 +28,61 @@ thinking_log.append({
 
 ```typescript
 // ✅ 四种专门记忆类型
-await memory.thought.record({
-  /* 思维 */
-});
-await memory.conversation.record({
-  /* 对话 */
-});
-await memory.decision.record({
-  /* 决策 */
-});
-await memory.experience.record({
-  /* 经验 */
-});
+await memory.recordThought('我需要先收集 10 个木头');
+await memory.recordConversation('Player123', '帮我建造一个房子');
+await memory.recordDecision('move', { x: 100 }, 'success');
+await memory.recordExperience('在夜晚挖矿很危险', '挖矿');
 
-// ✅ 支持查询
-const recentThoughts = await memory.thought.query({ limit: 10 });
+const recentDecisions = await memory.decision.getRecent(10);
+const summary = memory.buildContextSummary({ includeDecisions: 5 });
 
 // ✅ 自动持久化
 await memory.saveAll();
 ```
+
+---
+
+## 🏗️ 架构
+
+### 组件结构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Agent                                  │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │                   MemoryService                          ││
+│  │  (门面层 - 统一访问入口)                                 ││
+│  └─────────────────────────────────────────────────────────┘│
+│                            │                                 │
+│                            ▼                                 │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │                 MemoryManager                            ││
+│  │  (存储层 - 负责持久化)                                   ││
+│  │  - ThoughtMemory                                         ││
+│  │  - ConversationMemory                                    ││
+│  │  - DecisionMemory                                        ││
+│  │  - ExperienceMemory                                       ││
+│  └─────────────────────────────────────────────────────────┘│
+│                            │                                 │
+│                            ▼ (发布事件)                      │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │                    EventBus                               ││
+│  │  (事件总线 - 解耦外部集成)                                ││
+│  └─────────────────────────────────────────────────────────┘│
+│              │                       │                      │
+│              ▼                       ▼                      │
+│  ┌──────────────────┐    ┌──────────────────┐               │
+│  │ WebSocketAdapter │    │  MaiBotAdapter  │               │
+│  │ (推送记忆到WS)   │    │ (发送到MaiBot)   │               │
+│  └──────────────────┘    └──────────────────┘               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 核心原则
+
+1. **单一职责**: MemoryManager 只负责存储，MemoryService 负责统一访问
+2. **事件驱动**: 外部集成通过事件订阅解耦
+3. **依赖注入**: 所有依赖通过构造函数注入，便于测试
 
 ---
 
@@ -57,11 +93,9 @@ await memory.saveAll();
 **用途**：记录 AI 的内部思考过程
 
 ```typescript
-await memory.thought.record({
-  category: 'planning',
-  content: '我需要先收集 10 个木头，然后制作工作台',
-  context: { goal: 'build_house' },
-  importance: 'high',
+// 通过 MemoryService 记录
+memoryService.recordThought('我需要先收集 10 个木头，然后制作工作台', {
+  goal: 'build_house',
 });
 ```
 
@@ -76,11 +110,8 @@ await memory.thought.record({
 **用途**：记录与玩家的聊天互动
 
 ```typescript
-await memory.conversation.record({
-  speaker: 'Player123',
-  message: '帮我建造一个房子',
-  response: '好的，我会开始收集材料',
-  context: { location: homePosition },
+memoryService.recordConversation('Player123', '帮我建造一个房子', {
+  location: homePosition,
 });
 ```
 
@@ -95,13 +126,7 @@ await memory.conversation.record({
 **用途**：记录行动决策及其结果
 
 ```typescript
-await memory.decision.record({
-  action: 'mine_block',
-  params: { name: 'iron_ore', count: 10 },
-  result: { success: true, message: '成功挖掘 10 个铁矿' },
-  reasoning: '需要铁矿来制作工具',
-  context: { goal: 'craft_iron_pickaxe' },
-});
+memoryService.recordDecision('挖掘铁矿', { action: 'mine_block', params: { name: 'iron_ore', count: 10 } }, 'success', '需要铁矿来制作工具');
 ```
 
 **适用场景**：
@@ -115,12 +140,7 @@ await memory.decision.record({
 **用途**：记录学习到的经验教训
 
 ```typescript
-await memory.experience.record({
-  category: 'mining',
-  lesson: '在夜晚挖矿很危险，容易遭遇怪物攻击',
-  context: { event: 'death', cause: 'zombie' },
-  importance: 'high',
-});
+memoryService.recordExperience('在夜晚挖矿很危险，容易遭遇怪物攻击', 'Y=12 层挖矿时被僵尸攻击', 0.8);
 ```
 
 **适用场景**：
@@ -133,74 +153,57 @@ await memory.experience.record({
 
 ## 💻 基本使用
 
-### 初始化记忆系统
+### 通过 AgentState 访问
 
 ```typescript
-import { MemoryManager } from '@/core/agent/memory/MemoryManager';
-
-const memory = new MemoryManager();
-
-// 加载持久化的记忆
-await memory.loadAll();
+// Agent 内部通过 state.memory 访问
+this.state.memory.recordThought('我需要找到铁矿');
+this.state.memory.recordConversation('Player1', '你好');
 ```
 
 ### 记录记忆
 
 ```typescript
 // 记录思维
-await memory.thought.record({
-  category: 'planning',
-  content: '我需要找到铁矿',
-  context: { currentTask: 'gather_materials' },
+memoryService.recordThought('我需要找到铁矿', {
+  currentTask: 'gather_materials',
 });
 
 // 记录对话
-await memory.conversation.record({
-  speaker: 'Player1',
-  message: '你好',
-  response: '你好！有什么我可以帮忙的吗？',
-});
+memoryService.recordConversation('Player1', '你好');
 
 // 记录决策
-await memory.decision.record({
-  action: 'move',
-  params: { x: 100, y: 64, z: 200 },
-  result: { success: true },
-  reasoning: '移动到矿洞入口',
-});
+memoryService.recordDecision('移动到位置', { actionType: 'move', params: { x: 100, y: 64, z: 200 } }, 'success');
 
 // 记录经验
-await memory.experience.record({
-  category: 'combat',
-  lesson: '对付僵尸时保持距离很重要',
-  importance: 'high',
-});
+memoryService.recordExperience('对付僵尸时保持距离很重要', 'combat', 0.7);
 ```
 
 ### 查询记忆
 
 ```typescript
 // 查询最近的思维
-const recentThoughts = await memory.thought.query({
-  limit: 10,
-  filters: { category: 'planning' },
-});
+const recentThoughts = memoryService.thought.getRecent(10);
 
-// 查询对话历史
-const conversations = await memory.conversation.query({
-  limit: 20,
-  filters: { speaker: 'Player1' },
-});
+// 查询最近的对话
+const conversations = memoryService.conversation.getRecent(20);
 
-// 查询决策记录
-const decisions = await memory.decision.query({
-  limit: 15,
-  filters: { action: 'mine_block' },
-});
+// 查询最近的决策
+const decisions = memoryService.decision.getRecent(15);
 
-// 查询经验教训
-const experiences = await memory.experience.query({
-  filters: { category: 'mining', importance: 'high' },
+// 查询最近的经验
+const experiences = memoryService.experience.getRecent(5);
+```
+
+### 构建上下文摘要
+
+```typescript
+// 构建完整的上下文摘要（用于 LLM）
+const summary = memoryService.buildContextSummary({
+  includeThoughts: 5,
+  includeConversations: 3,
+  includeDecisions: 10,
+  includeExperiences: 3,
 });
 ```
 
@@ -208,24 +211,38 @@ const experiences = await memory.experience.query({
 
 ```typescript
 // 保存所有记忆
-await memory.saveAll();
-
-// 保存单个类型
-await memory.thought.save();
-await memory.conversation.save();
+await memoryService.saveAll();
 
 // 加载所有记忆
-await memory.loadAll();
+await memoryService.loadAll();
 ```
 
-### 清理记忆
+---
+
+## 🔌 事件系统
+
+### 事件类型
+
+记忆系统通过 EventBus 发布以下事件：
+
+| 事件名                         | 说明     | Payload                        |
+| ------------------------------ | -------- | ------------------------------ |
+| `memory:thought:recorded`      | 思维记录 | `{ entry: ThoughtEntry }`      |
+| `memory:conversation:recorded` | 对话记录 | `{ entry: ConversationEntry }` |
+| `memory:decision:recorded`     | 决策记录 | `{ entry: DecisionEntry }`     |
+| `memory:experience:recorded`   | 经验记录 | `{ entry: ExperienceEntry }`   |
+
+### 订阅事件
 
 ```typescript
-// 清理过时记忆（自动保留重要记忆）
-await memory.cleanup();
+import { EventBus } from '@/core/events/EventBus';
+import { MemoryEventTypes } from '@/core/events/types';
 
-// 清空所有记忆
-await memory.clearAll();
+const eventBus = EventBus.getInstance();
+
+eventBus.onMemory(MemoryEventTypes.THOUGHT_RECORDED, data => {
+  console.log('新思维:', data.entry.content);
+});
 ```
 
 ---
@@ -250,31 +267,33 @@ await memory.clearAll();
 // MainDecisionLoop.ts
 async think(): Promise<void> {
   // 1. 获取相关记忆
-  const recentThoughts = await this.state.memory.thought.query({ limit: 5 });
-  const recentDecisions = await this.state.memory.decision.query({ limit: 10 });
+  const recentDecisions = this.state.memory.decision.getRecent(10);
+  const recentThoughts = this.state.memory.thought.getRecent(5);
 
-  // 2. 包含在 Prompt 中
-  const prompt = this.generatePrompt({
-    thoughts: recentThoughts,
-    decisions: recentDecisions
+  // 2. 构建上下文摘要
+  const contextSummary = this.state.memory.buildContextSummary({
+    includeThoughts: 5,
+    includeDecisions: 10,
   });
 
-  // 3. 调用 LLM
+  // 3. 包含在 Prompt 中
+  const prompt = this.generatePrompt({
+    contextSummary,
+    decisions: recentDecisions,
+  });
+
+  // 4. 调用 LLM
   const response = await this.llmManager.chat(prompt);
 
-  // 4. 记录新的思维
-  await this.state.memory.thought.record({
-    category: 'decision',
-    content: response.thinking,
-    context: { mode: this.state.modeManager.getCurrentMode() }
-  });
+  // 5. 记录新的思维
+  this.state.memory.recordThought(response.thinking);
 
-  // 5. 记录决策
-  await this.state.memory.decision.record({
-    action: response.action,
-    params: response.params,
-    reasoning: response.thinking
-  });
+  // 6. 记录决策
+  this.state.memory.recordDecision(
+    response.intention,
+    response.action,
+    response.result
+  );
 }
 ```
 
@@ -283,16 +302,7 @@ async think(): Promise<void> {
 ```typescript
 // 监听死亡事件，记录经验
 bot.on('death', () => {
-  memory.experience.record({
-    category: 'survival',
-    lesson: '需要更加小心，避免死亡',
-    context: {
-      location: gameState.position,
-      health: gameState.health,
-      cause: 'unknown',
-    },
-    importance: 'high',
-  });
+  this.state.memory.recordExperience('需要更加小心，避免死亡', `在 ${gameState.position} 死亡`, 0.9);
 });
 ```
 
@@ -304,58 +314,43 @@ bot.on('death', () => {
 
 ```typescript
 // ✅ 正确：思维记忆用于内部推理
-await memory.thought.record({
-  content: '我需要先做一个工作台',
-});
+this.state.memory.recordThought('我需要先做一个工作台');
 
-// ❌ 错误：不要在思维记忆中记录对话
-await memory.thought.record({
-  content: '玩家说：你好', // 应该用 conversation
-});
+// ✅ 正确：对话记忆用于聊天记录
+this.state.memory.recordConversation(username, message);
+
+// ✅ 正确：决策记忆用于记录动作决策
+this.state.memory.recordDecision(intention, action, result);
+
+// ✅ 正确：经验记忆用于记录教训
+this.state.memory.recordExperience(lesson, context, confidence);
 ```
 
-### 2. 设置合适的重要性
+### 2. 记录足够的上下文
 
 ```typescript
-// ✅ 重要经验标记为 high
-await memory.experience.record({
-  lesson: '钻石在 Y=12 层最多',
-  importance: 'high',
-});
-
-// ✅ 日常决策标记为 normal
-await memory.decision.record({
-  action: 'move',
-  importance: 'normal',
-});
+// ✅ 提供丰富的上下文
+this.state.memory.recordDecision(
+  '制作木镐',
+  { actionType: 'craft', params: { item: 'wooden_pickaxe', count: 1 } },
+  'success',
+  '需要挖掘石头来制作更好的工具',
+);
 ```
 
 ### 3. 定期持久化
 
-```typescript
-// 在 Agent 中设置定期保存
-setInterval(
-  async () => {
-    await memory.saveAll();
-  },
-  5 * 60 * 1000,
-); // 每 5 分钟保存一次
-```
+记忆系统会在 Agent 生命周期内自动持久化，无需手动调用。
 
-### 4. 提供足够的上下文
+### 4. 使用上下文摘要
 
 ```typescript
-// ✅ 提供丰富的上下文
-await memory.decision.record({
-  action: 'craft',
-  params: { item: 'wooden_pickaxe' },
-  result: { success: true },
-  reasoning: '需要挖掘石头来制作更好的工具',
-  context: {
-    goal: 'upgrade_tools',
-    currentPlan: 'gather_materials',
-    location: gameState.position,
-  },
+// 构建摘要用于 LLM 上下文
+const summary = this.state.memory.buildContextSummary({
+  includeThoughts: 3,
+  includeDecisions: 5,
+  includeConversations: 2,
+  includeExperiences: 2,
 });
 ```
 
@@ -365,7 +360,8 @@ await memory.decision.record({
 
 - [代理系统](agent-system.md) - 了解记忆系统在 Agent 中的使用
 - [规划系统](planning-system.md) - 了解记忆如何配合任务规划
+- [事件系统](event-system.md) - 了解 EventBus 事件机制
 
 ---
 
-_最后更新: 2025-11-01_
+_最后更新: 2026-02-28_

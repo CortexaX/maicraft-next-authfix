@@ -42,8 +42,7 @@ class MaicraftNext {
 
       await initializeServices(this.services, this.bot!, this.logger);
 
-      this.services.agent.setWebSocketServer(this.services.wsServer);
-      this.services.wsServer.setMemoryManager(this.services.agent.getMemoryManager());
+      this.services.wsServer.setMemoryManager(this.services.agent.getMemoryService());
 
       await this.services.agent.start();
       this.logger.info('✅ Agent已启动');
@@ -246,8 +245,7 @@ class MaicraftNext {
 
     await initializeServices(this.services, this.bot!, this.logger);
 
-    this.services.agent.setWebSocketServer(this.services.wsServer);
-    this.services.wsServer.setMemoryManager(this.services.agent.getMemoryManager());
+    this.services.wsServer.setMemoryManager(this.services.agent.getMemoryService());
 
     await this.services.agent.start();
 

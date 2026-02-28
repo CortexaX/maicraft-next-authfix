@@ -4,6 +4,21 @@
 
 记忆接口允许客户端订阅和接收 Maicraft-Next 的实时记忆数据，支持查询、添加、修改和删除记忆。记忆系统分为四种类型：思维、对话、决策和经验记忆。
 
+**架构说明**：记忆推送采用事件驱动模式。当记忆被记录时，MemoryManager 通过 EventBus 发布事件，WebSocketAdapter 订阅这些事件并将记忆推送到客户端。
+
+## 事件驱动推送
+
+记忆系统通过 EventBus 发布以下事件：
+
+| 事件名                         | 说明     |
+| ------------------------------ | -------- |
+| `memory:thought:recorded`      | 思维记录 |
+| `memory:conversation:recorded` | 对话记录 |
+| `memory:decision:recorded`     | 决策记录 |
+| `memory:experience:recorded`   | 经验记录 |
+
+WebSocketAdapter 订阅这些事件，收到后立即推送到客户端（无需轮询）。
+
 ## 订阅记忆
 
 客户端发送订阅请求：
