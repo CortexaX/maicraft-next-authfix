@@ -6,7 +6,7 @@
  */
 
 import { MemoryManager } from './MemoryManager';
-import { EventBus } from '@/core/events/EventBus';
+import { EventBus } from '@/core/events';
 import type { MemoryService as IMemoryService } from './MemoryService';
 import type { MemoryStats } from './types';
 

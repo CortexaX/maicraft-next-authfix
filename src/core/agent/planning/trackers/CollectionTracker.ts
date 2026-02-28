@@ -9,7 +9,7 @@
 
 import type { Tracker, TrackerProgress } from './types';
 import type { GameContext } from '@/core/agent/types';
-import type { EventManager, ListenerHandle } from '@/core/events/EventManager';
+import type { EventBus, ListenerHandle } from '@/core/events/EventBus';
 
 export class CollectionTracker implements Tracker {
   readonly type = 'collection';
@@ -20,16 +20,13 @@ export class CollectionTracker implements Tracker {
   constructor(
     private itemName: string,
     private targetCount: number,
-    private eventManager: EventManager,
+    private eventBus: EventBus,
   ) {
     this.setupEventListener();
   }
 
-  /**
-   * 设置事件监听器
-   */
   private setupEventListener(): void {
-    this.eventHandle = this.eventManager.on('playerCollect', (data: any) => {
+    this.eventHandle = this.eventBus.on('game:playerCollect', (data: any) => {
       // 从 collected.metadata 提取物品信息
       const items = this.extractItems(data.collected);
       const collected = items.filter((item: any) => item.name === this.itemName).reduce((sum: number, item: any) => sum + item.count, 0);
@@ -63,11 +60,11 @@ export class CollectionTracker implements Tracker {
       });
   }
 
-  checkCompletion(context: GameContext): boolean {
+  checkCompletion(_context: GameContext): boolean {
     return this.collectedCount >= this.targetCount;
   }
 
-  getProgress(context: GameContext): TrackerProgress {
+  getProgress(_context: GameContext): TrackerProgress {
     return {
       current: this.collectedCount,
       target: this.targetCount,
@@ -106,8 +103,8 @@ export class CollectionTracker implements Tracker {
     };
   }
 
-  static fromJSON(json: any, eventManager: EventManager): CollectionTracker {
-    const tracker = new CollectionTracker(json.itemName, json.targetCount, eventManager);
+  static fromJSON(json: any, eventBus: EventBus): CollectionTracker {
+    const tracker = new CollectionTracker(json.itemName, json.targetCount, eventBus);
     // 恢复已收集的数量
     if (json.collectedCount !== undefined) {
       tracker.collectedCount = json.collectedCount;

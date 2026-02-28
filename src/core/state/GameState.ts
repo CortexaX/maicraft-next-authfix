@@ -2,7 +2,7 @@ import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { Item } from 'prismarine-item';
 import { getLogger, type Logger } from '@/utils/Logger';
-import { EventManager, type ListenerHandle } from '@/core/events/EventManager';
+import { EventBus, type ListenerHandle } from '@/core/events/EventBus';
 
 export interface ItemInfo {
   name: string;
@@ -77,7 +77,7 @@ export class GameState {
   /**
    * 初始化游戏状态，设置事件监听（通过 EventManager）
    */
-  initialize(bot: Bot, events: EventManager): void {
+  initialize(bot: Bot, events: EventBus): void {
     if (this.initialized) {
       this.logger.warn('已经初始化，跳过');
       return;
@@ -98,59 +98,57 @@ export class GameState {
       items: initialItems.map(i => `${i.name}x${i.count}`).join(', ') || '无',
     });
 
-    // 通过 EventManager 订阅事件，避免双重监听
-    // 注意：EventManager 的回调参数是 data 对象，但部分属性需要从 bot 读取
     this.eventHandles.push(
-      events.on('health', () => {
+      events.on('game:health', () => {
         this.updateHealth(bot);
         this.updateFood(bot);
       }),
     );
 
     this.eventHandles.push(
-      events.on('move', () => {
+      events.on('game:move', () => {
         this.updatePosition(bot);
       }),
     );
 
     this.eventHandles.push(
-      events.on('experience', () => {
+      events.on('game:experience', () => {
         this.updateExperience(bot);
       }),
     );
 
     this.eventHandles.push(
-      events.on('windowUpdate', () => {
+      events.on('game:windowUpdate', () => {
         this.updateInventory(bot);
       }),
     );
 
     this.eventHandles.push(
-      events.on('playerCollect', () => {
+      events.on('game:playerCollect', () => {
         this.updateInventory(bot);
       }),
     );
 
     this.eventHandles.push(
-      events.on('time', data => {
+      events.on('game:time', data => {
         this.timeOfDay = data.timeOfDay;
       }),
     );
 
     this.eventHandles.push(
-      events.on('weather', () => {
+      events.on('game:weather', () => {
         this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
       }),
     );
 
     this.eventHandles.push(
-      events.on('sleep', () => {
+      events.on('game:sleep', () => {
         this.isSleeping = true;
       }),
     );
 
     this.eventHandles.push(
-      events.on('wake', () => {
+      events.on('game:wake', () => {
         this.isSleeping = false;
       }),
     );

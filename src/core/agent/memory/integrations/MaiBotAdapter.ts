@@ -6,7 +6,6 @@
  */
 
 import { EventBus } from '@/core/events/EventBus';
-import { MemoryEventTypes } from '@/core/events/types';
 import type { MaiBotClient } from '../../communication/MaiBotClient';
 import type { MemoryService } from '../MemoryService';
 
@@ -31,13 +30,13 @@ export class MaiBotAdapter {
       });
     });
 
-    this.eventBus.onMemory(MemoryEventTypes.THOUGHT_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:thought:recorded', (data: any) => {
       if (data.entry.context?.source !== 'maibot') {
         this.maiBotClient.sendThoughtMemory(data.entry);
       }
     });
 
-    this.eventBus.onMemory(MemoryEventTypes.DECISION_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:decision:recorded', (data: any) => {
       this.maiBotClient.sendDecisionMemory(data.entry);
     });
 

@@ -304,19 +304,22 @@ class MaicraftTestBot {
 
     this.registerActions();
 
-    const events = this.executor.getEventManager();
+    const events = this.executor.getEventBus();
     gameState.initialize(this.bot, events);
     logger.info('✅ GameState 初始化完成');
 
-    events.on('actionComplete', data => {
-      logger.info(`✅ 动作完成: ${data.actionName} (${data.duration}ms)`);
+    events.on(
+      'action:complete',
+      (data: { actionId: string; actionName: string; duration: number; result: { success: boolean; message: string } }) => {
+        logger.info(`✅ 动作完成: ${data.actionName} (${data.duration}ms)`);
+      },
+    );
+
+    events.on('action:error', data => {
+      logger.error(`❌ 动作错误: ${data.actionName}`, { actionId: data.actionId }, data.error);
     });
 
-    events.on('actionError', data => {
-      logger.error(`❌ 动作错误: ${data.actionName}`, data.error);
-    });
-
-    events.on('health', data => {
+    events.on('game:health', (data: { health: number; food: number; foodSaturation: number }) => {
       if (data.health < 6) {
         logger.warn(`⚠️ 生命值过低: ${data.health}/20`);
       }

@@ -6,7 +6,7 @@
 export * from './state/GameState';
 
 // 事件系统
-export * from './events/EventManager';
+export * from './events/EventBus';
 
 // 动作系统
 export * from './actions/Action';

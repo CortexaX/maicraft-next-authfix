@@ -159,8 +159,8 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
   const memoryManager = new MemoryManager(config, logger, eventBus);
   const memoryService = new MemoryServiceImpl(memoryManager, eventBus);
 
-  const interruptManager = new InterruptManager(gameState, actionExecutor.getEventManager());
-  const trackerFactory = new TrackerFactory(actionExecutor.getEventManager());
+  const interruptManager = new InterruptManager(gameState, actionExecutor.getEventBus());
+  const trackerFactory = new TrackerFactory(actionExecutor.getEventBus());
   const configLoader = new ConfigLoader();
   const promptManager = new PromptManager();
   const promptOverrideManager = createPromptOverrideManager(getDefaultOverrideTemplates());
@@ -198,19 +198,19 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 }
 
 export async function initializeServices(services: AppServices, bot: Bot, logger: Logger): Promise<void> {
-  const events = services.actionExecutor.getEventManager();
+  const events = services.actionExecutor.getEventBus();
 
   services.gameState.initialize(bot, events);
 
-  events.on('actionComplete', (data: any) => {
+  events.on('action:complete', data => {
     logger.debug(`动作完成: ${data.actionName}`, {
       duration: data.duration,
       result: data.result.message,
     });
   });
 
-  events.on('actionError', (data: any) => {
-    logger.error(`动作错误: ${data.actionName}`, data.error);
+  events.on('action:error', data => {
+    logger.error(`动作错误: ${data.actionName}`, { actionId: data.actionId }, data.error);
   });
 
   const configManager = getConfigManager();

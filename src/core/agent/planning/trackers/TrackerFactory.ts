@@ -9,7 +9,7 @@
  */
 
 import type { Tracker, TrackerConfig, ITrackerFactory } from './types';
-import type { EventManager } from '@/core/events/EventManager';
+import type { EventBus } from '@/core/events/EventBus';
 import { CollectionTracker } from './CollectionTracker';
 import { LocationTracker } from './LocationTracker';
 import { CraftTracker } from './CraftTracker';
@@ -20,7 +20,7 @@ import { CompositeTracker } from './CompositeTracker';
 export class TrackerFactory implements ITrackerFactory {
   private trackers: Map<string, any>;
 
-  constructor(private eventManager: EventManager) {
+  constructor(private eventBus: EventBus) {
     this.trackers = new Map<string, any>([
       ['collection', CollectionTracker],
       ['location', LocationTracker],
@@ -62,7 +62,7 @@ export class TrackerFactory implements ITrackerFactory {
 
     // CollectionTracker 需要注入 eventManager
     if (json.type === 'collection') {
-      return CollectionTracker.fromJSON(json, this.eventManager);
+      return CollectionTracker.fromJSON(json, this.eventBus);
     }
 
     return TrackerClass.fromJSON(json);
@@ -80,15 +80,11 @@ export class TrackerFactory implements ITrackerFactory {
    * @deprecated 使用DI容器：container.resolve(ServiceKeys.TrackerFactory).fromJSON(json)
    * 注意：静态方法无法获取 eventManager，CollectionTracker 无法使用
    */
-  static fromJSON(json: any): Tracker {
+  static fromJSON(_json: unknown): Tracker {
     throw new Error('TrackerFactory.fromJSON 已废弃，请使用 DI 容器获取 TrackerFactory 实例');
   }
 
-  /**
-   * 兼容旧代码的静态方法
-   * @deprecated 使用DI容器
-   */
-  static register(type: string, trackerClass: any): void {
+  static register(_type: string, _trackerClass: unknown): void {
     throw new Error('TrackerFactory.register 已废弃，请使用 DI 容器获取 TrackerFactory 实例');
   }
 

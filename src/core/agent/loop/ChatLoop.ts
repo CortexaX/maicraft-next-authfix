@@ -31,7 +31,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
    * 设置聊天监听器
    */
   private setupChatListener(): void {
-    this.state.context.events.on('chat', (data: { username: string; message: string }) => {
+    this.state.context.events.on('game:chat', (data: { username: string; message: string }) => {
       // 获取机器人用户名，用于过滤自己的消息
       const botUsername = this.state.config.minecraft.username || this.state.context.gameState.playerName;
 

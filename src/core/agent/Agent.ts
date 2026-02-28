@@ -238,22 +238,18 @@ export class Agent {
   private setupEventListeners(): void {
     const { context } = this.state;
 
-    // 受伤事件 - 不再切换模式，由 InterruptSystem 在下一轮检测
-    context.events.on('entityHurt', async (data: any) => {
+    context.events.on('game:entityHurt', async (data: { entity: { id: number }; source?: unknown }) => {
       if (data.entity?.id === context.bot.entity?.id) {
         this.state.memory.recordThought('受到攻击', { entity: data.entity });
-        // InterruptSystem 会在下一轮循环检测到威胁
       }
     });
 
-    // 重生事件 - 恢复正常状态
-    context.events.on('spawn', () => {
+    context.events.on('game:spawn', () => {
       this.logger.info('玩家重生');
       this.state.memory.recordThought('玩家重生，恢复正常活动', {});
     });
 
-    // 健康和饥饿状态变化 - AI决策相关
-    context.events.on('health', (data: any) => {
+    context.events.on('game:health', (data: { health: number; food: number }) => {
       const { health, food } = data;
 
       // 低血量警告

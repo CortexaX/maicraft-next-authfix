@@ -6,7 +6,7 @@ import { ContainerCache } from '@/core/cache/ContainerCache';
 import { LocationManager } from '@/core/cache/LocationManager';
 import { CacheManager } from '@/core/cache/CacheManager';
 import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
-import { EventManager } from '@/core/events/EventManager';
+import { EventBus } from '@/core/events/EventBus';
 import { GameState } from '@/core/state/GameState';
 import type { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
 import type { MovementUtils } from '@/utils/MovementUtils';
@@ -35,7 +35,8 @@ export class ContextManager {
   private context: RuntimeContext;
 
   constructor(params: ContextManagerParams) {
-    const events = new EventManager(params.bot);
+    const events = EventBus.getInstance();
+    events.attachBot(params.bot);
 
     this.context = {
       bot: params.bot,
@@ -71,7 +72,6 @@ export class ContextManager {
 
   updateExecutor(executor: ActionExecutor): void {
     this.context.executor = executor;
-    this.context.events = executor.getEventManager();
   }
 
   cleanup(): void {

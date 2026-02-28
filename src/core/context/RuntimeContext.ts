@@ -1,7 +1,7 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { GameState } from '@/core/state/GameState';
-import { EventManager } from '@/core/events/EventManager';
+import { EventBus } from '@/core/events/EventBus';
 import type { ActionExecutor } from '@/core/actions/ActionExecutor';
 import type { Location } from '@/core/cache/LocationManager';
 import { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
@@ -56,7 +56,7 @@ export interface RuntimeContext {
   cacheManager: CacheManager;
   nearbyBlockManager: NearbyBlockManager;
 
-  events: EventManager;
+  events: EventBus;
 
   signal: AbortSignal;
 

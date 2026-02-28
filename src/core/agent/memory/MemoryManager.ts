@@ -10,8 +10,7 @@ import { ConversationMemory } from './ConversationMemory';
 import { DecisionMemory } from './DecisionMemory';
 import { ExperienceMemory } from './ExperienceMemory';
 import type { MemoryStore, ThoughtEntry, ConversationEntry, DecisionEntry, ExperienceEntry, MemoryStats } from './types';
-import { EventBus } from '@/core/events/EventBus';
-import { MemoryEventTypes } from '@/core/events/types';
+import { EventBus } from '@/core/events';
 
 export class MemoryManager {
   private thoughts: ThoughtMemory;
@@ -74,7 +73,7 @@ export class MemoryManager {
     };
     this.thoughts.add(entry);
 
-    this.eventBus.emitMemory(MemoryEventTypes.THOUGHT_RECORDED, { entry });
+    this.eventBus.emit('memory:thought:recorded', { entry });
   }
 
   /**
@@ -91,7 +90,7 @@ export class MemoryManager {
     this.conversations.add(entry);
     this.logger.debug(`💬 记录对话: ${speaker} - ${message.substring(0, 50)}${message.length > 50 ? '...' : ''}`);
 
-    this.eventBus.emitMemory(MemoryEventTypes.CONVERSATION_RECORDED, { entry });
+    this.eventBus.emit('memory:conversation:recorded', { entry });
   }
 
   /**
@@ -109,7 +108,7 @@ export class MemoryManager {
     this.decisions.add(entry);
     this.logger.debug(`🎯 记录决策: ${result} - ${intention}`);
 
-    this.eventBus.emitMemory(MemoryEventTypes.DECISION_RECORDED, { entry });
+    this.eventBus.emit('memory:decision:recorded', { entry });
   }
 
   /**
@@ -128,7 +127,7 @@ export class MemoryManager {
     this.experiences.add(entry);
     this.logger.debug(`📚 记录经验: ${lesson.substring(0, 50)}${lesson.length > 50 ? '...' : ''} (置信度: ${(confidence * 100).toFixed(0)}%)`);
 
-    this.eventBus.emitMemory(MemoryEventTypes.EXPERIENCE_RECORDED, { entry });
+    this.eventBus.emit('memory:experience:recorded', { entry });
   }
 
   /**

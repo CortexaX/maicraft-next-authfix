@@ -1,8 +1,8 @@
-import type { ListenerHandle } from '@/core/events/EventManager';
+import type { ListenerHandle } from '@/core/events/EventBus';
 import { CancellationError } from './CancellationError';
 import type { InterruptHandler, InterruptConfig } from './types';
 import type { GameState } from '@/core/state/GameState';
-import type { EventManager } from '@/core/events/EventManager';
+import type { EventBus } from '@/core/events/EventBus';
 import { getLogger, type Logger } from '@/utils/Logger';
 
 const DEFAULT_CONFIG: InterruptConfig = {
@@ -15,12 +15,12 @@ export class InterruptManager {
   private handlers: InterruptHandler[] = [];
   private status: 'idle' | 'handling' = 'idle';
   private gameState: GameState;
-  private events: EventManager;
+  private events: EventBus;
   private logger: Logger;
   private config: InterruptConfig;
   private eventCleanups: Array<ListenerHandle> = [];
 
-  constructor(gameState: GameState, events: EventManager, config?: Partial<InterruptConfig>) {
+  constructor(gameState: GameState, events: EventBus, config?: Partial<InterruptConfig>) {
     this.gameState = gameState;
     this.events = events;
     this.config = { ...DEFAULT_CONFIG, ...config };
@@ -110,7 +110,7 @@ export class InterruptManager {
 
   private setupEventListeners(): void {
     const onDeath = () => this.interrupt('玩家死亡');
-    const handle = this.events.on('death', onDeath);
+    const handle = this.events.on('game:death', onDeath);
     this.eventCleanups.push(handle);
   }
 

@@ -5,7 +5,6 @@
  */
 
 import { EventBus } from '@/core/events/EventBus';
-import { MemoryEventTypes } from '@/core/events/types';
 import type { WebSocketServer } from '@/api/WebSocketServer';
 
 export class WebSocketAdapter {
@@ -20,19 +19,19 @@ export class WebSocketAdapter {
   }
 
   initialize(): void {
-    this.eventBus.onMemory(MemoryEventTypes.THOUGHT_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:thought:recorded', (data: any) => {
       this.pushMemory('thought', data.entry);
     });
 
-    this.eventBus.onMemory(MemoryEventTypes.CONVERSATION_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:conversation:recorded', (data: any) => {
       this.pushMemory('conversation', data.entry);
     });
 
-    this.eventBus.onMemory(MemoryEventTypes.DECISION_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:decision:recorded', (data: any) => {
       this.pushMemory('decision', data.entry);
     });
 
-    this.eventBus.onMemory(MemoryEventTypes.EXPERIENCE_RECORDED as any, (data: any) => {
+    this.eventBus.on('memory:experience:recorded', (data: any) => {
       this.pushMemory('experience', data.entry);
     });
 

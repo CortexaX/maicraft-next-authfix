@@ -80,7 +80,7 @@ export class ActionExecutor {
       context.logger.info(`动作执行${result.success ? '成功' : '失败'}: ${result.message} (耗时: ${duration}ms)`);
 
       // 触发自定义事件
-      context.events.emit('actionComplete', {
+      context.events.emit('action:complete', {
         actionId,
         actionName: action.name,
         result,
@@ -93,7 +93,7 @@ export class ActionExecutor {
       context.logger.error(`动作执行异常:`, err);
 
       // 触发错误事件
-      context.events.emit('actionError', {
+      context.events.emit('action:error', {
         actionId,
         actionName: action.name,
         error: err,
@@ -131,7 +131,7 @@ export class ActionExecutor {
   /**
    * 获取事件管理器
    */
-  getEventManager() {
+  getEventBus() {
     const context = this.contextManager.getContext();
     return context.events;
   }
