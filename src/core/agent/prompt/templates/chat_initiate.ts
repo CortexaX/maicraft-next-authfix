@@ -19,12 +19,15 @@ export function initChatInitiateTemplate(): void {
 # 当前活动
 {current_activity}
 
+# 当前思考和决策
+{agent_context}
+
 # 当前位置
 {position}
 
 现在你想主动发起一个话题或分享一些信息。`,
       '主动聊天',
-      ['player_name', 'recent_conversations', 'current_activity', 'position'],
+      ['player_name', 'recent_conversations', 'current_activity', 'agent_context', 'position'],
     ),
   );
 }

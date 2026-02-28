@@ -19,12 +19,15 @@ export function initChatResponseTemplate(): void {
 # 当前活动
 {current_activity}
 
+# 当前思考和决策
+{agent_context}
+
 # 当前位置
 {position}
 
 请回复最近的聊天消息。`,
       '聊天响应',
-      ['player_name', 'recent_conversations', 'current_activity', 'position'],
+      ['player_name', 'recent_conversations', 'current_activity', 'agent_context', 'position'],
     ),
   );
 }
