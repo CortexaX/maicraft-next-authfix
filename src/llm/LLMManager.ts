@@ -4,20 +4,8 @@
  * 提供简洁的LLM调用接口，正确使用system/user角色
  */
 
-import { Logger as RuntimeLogger } from '@/core/context/RuntimeContext';
 import { Logger, getLogger } from '@/utils/Logger.js';
-import {
-  LLMConfig,
-  LLMResponse,
-  LLMRequestConfig,
-  LLMError,
-  LLMProvider,
-  ChatMessage,
-  MessageRole,
-  TokenUsage,
-  ToolCall,
-  UsageStats,
-} from './types.js';
+import { LLMConfig, LLMRequestConfig, LLMError, LLMProvider, ChatMessage, MessageRole, TokenUsage, ToolCall, UsageStats } from './types.js';
 import { OpenAIProvider } from './providers/OpenAIProvider.js';
 import { UsageTracker } from './usage/UsageTracker.js';
 import { ILLMProvider } from './providers/OpenAIProvider.js';
@@ -39,14 +27,14 @@ export interface LLMClientResponse {
  * LLM客户端类 - 参考原maicraft项目的LLMClient
  */
 export class LLMManager {
-  private logger: RuntimeLogger;
+  private logger: Logger;
   private config: LLMConfig;
   private providers: Map<LLMProvider, ILLMProvider> = new Map();
   private usageTracker: UsageTracker;
   private activeProvider?: ILLMProvider;
   private isActive = true;
 
-  constructor(config: LLMConfig, usageTracker: UsageTracker, logger?: RuntimeLogger) {
+  constructor(config: LLMConfig, usageTracker: UsageTracker, logger?: Logger) {
     this.config = config;
     this.logger = logger || getLogger('LLMManager');
     this.usageTracker = usageTracker;
@@ -331,20 +319,22 @@ export class LLMManager {
    * 获取配置信息 - 参考原maicraft的get_config_info
    */
   getConfigInfo(): Record<string, any> {
+    const config = this.getActiveProviderConfig();
     return {
       provider: this.getActiveProvider(),
-      model: this.getActiveProviderConfig().model,
-      base_url: this.getActiveProviderConfig().base_url,
-      temperature: this.getActiveProviderConfig().temperature,
-      max_tokens: this.getActiveProviderConfig().max_tokens,
-      api_key_set: !!this.getActiveProviderConfig().api_key,
+      model: config.model,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      base_url: (config as any).base_url,
+      temperature: config.temperature,
+      max_tokens: config.max_tokens,
+      api_key_set: !!config.api_key,
     };
   }
 
   /**
    * 获取token使用量摘要 - 参考原maicraft的get_token_usage_summary
    */
-  getTokenUsageSummary(provider?: LLMProvider): string {
+  getTokenUsageSummary(_provider?: LLMProvider): string {
     const stats = this.getUsageStats();
     return `Token使用统计:
 总请求数: ${stats.total_requests}
@@ -430,15 +420,6 @@ export class LLMManager {
   }
 }
 
-/**
- * 便捷函数：创建全局LLM客户端实例
- */
-const globalLLMManager: LLMManager | null = null;
-
-/**
- * LLMManager 工厂 - 兼容旧代码，实际由DI容器管理单例
- * @deprecated 使用DI容器代替此工厂
- */
 export class LLMManagerFactory {
   private static instance: LLMManager | null = null;
 
@@ -448,7 +429,8 @@ export class LLMManagerFactory {
    */
   static create(config: LLMConfig, logger?: Logger): LLMManager {
     // 移除强制单例限制，允许多个实例（但实际由DI容器管理单例）
-    this.instance = new LLMManager(config, logger);
+    const usageTracker = new UsageTracker(config, logger);
+    this.instance = new LLMManager(config, usageTracker);
     return this.instance;
   }
 

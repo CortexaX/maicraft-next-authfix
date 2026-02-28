@@ -111,7 +111,6 @@ export class CacheManager {
 
       const blocks: Array<{ x: number; y: number; z: number; block: any }> = [];
       let scannedCount = 0;
-      let skipCount = 0;
 
       // 遍历区块内的所有方块（16×16×世界高度）
       // 使用世界坐标，不是相对坐标
@@ -148,14 +147,12 @@ export class CacheManager {
                     lightLevel: (block as any).lightLevel,
                     transparent: (block as any).transparent,
                     state: this.getBlockState(block),
-                    canSee, // 🆕 添加可视性信息
+                    canSee,
                   },
                 });
-              } else {
-                skipCount++;
               }
-            } catch (error) {
-              skipCount++;
+            } catch {
+              // Empty
             }
           }
         }
@@ -609,9 +606,7 @@ export class CacheManager {
           this.containerCache.setContainer(x, y, z, containerType, {
             type: containerType as any,
             position: new Vec3(x, y, z),
-            items: [], // 空物品列表，需要实际打开才能获取
             lastAccessed: Date.now(),
-            size: this.getContainerSize(containerType),
           });
 
           syncedCount++;
@@ -666,9 +661,7 @@ export class CacheManager {
           this.containerCache.setContainer(pos.x, pos.y, pos.z, containerType, {
             type: containerType as any,
             position: pos,
-            items: [], // 空物品列表，需要实际打开才能获取
             lastAccessed: Date.now(),
-            size: this.getContainerSize(containerType),
           });
 
           updatedCount++;

@@ -49,6 +49,7 @@ export class CraftManager {
 
   constructor(bot: Bot) {
     this.bot = bot;
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.mcData = require('minecraft-data')(bot.version);
   }
 
@@ -307,7 +308,8 @@ export class CraftManager {
     const item = Object.values(this.mcData.items).find((item: any) => item.name === itemName);
     if (!item) return [];
 
-    const recipes = this.mcData.recipes[item.id];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const recipes = this.mcData.recipes[(item as any).id];
     if (!recipes || !Array.isArray(recipes)) return [];
 
     return recipes.map((recipe: any) => ({
@@ -426,11 +428,11 @@ export class CraftManager {
     }
 
     if (recipe.inShape) {
-      const materialIds = new Set();
+      const materialIds = new Set<number>();
       recipe.inShape.forEach((row: any[]) => {
         row.forEach((id: any) => {
           if (id !== null && id !== undefined) {
-            materialIds.add(id);
+            materialIds.add(Number(id));
           }
         });
       });
@@ -587,7 +589,7 @@ export class CraftManager {
    * @returns 放置的工作台方块
    */
   private async placeCraftingTable(logger: Logger): Promise<any | null> {
-    const craftingTableItem = this.bot.inventory.findInventoryItem(this.mcData.itemsByName.crafting_table.id);
+    const craftingTableItem = this.bot.inventory.findInventoryItem(this.mcData.itemsByName.crafting_table.id, null, true);
 
     if (!craftingTableItem) {
       throw new Error('需要工作台但没有找到，请先合成工作台');
@@ -604,7 +606,7 @@ export class CraftManager {
       throw new Error('无法找到参考方块来放置工作台');
     }
 
-    await this.bot.placeBlock(craftingTableItem, referenceBlock);
+    await this.bot.placeBlock(craftingTableItem as any, referenceBlock as any);
     const placedTable = this.bot.blockAt(placementPos);
 
     if (placedTable) {
@@ -685,7 +687,8 @@ export class CraftManager {
       }
 
       try {
-        await this.bot.craft(recipe, count, craftingTable);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await this.bot.craft(recipe as any, count, craftingTable);
       } finally {
         // 确保恢复扫描
         if (scanningPaused && cacheManager && typeof cacheManager.resumeScanning === 'function') {
@@ -759,14 +762,11 @@ export class CraftManager {
    * @param details 详细信息
    * @returns 错误结果
    */
-  private createErrorResult(message: string, errorCode: CraftErrorCode = CRAFT_ERRORS.CRAFT_FAILED, details?: any): ActionResult {
+  private createErrorResult(message: string, _errorCode: CraftErrorCode = CRAFT_ERRORS.CRAFT_FAILED, _details?: any): ActionResult {
     return {
       success: false,
       message,
-      error: {
-        code: errorCode,
-        details,
-      },
+      error: new Error(message) as Error & { code?: string; details?: string },
     };
   }
 }

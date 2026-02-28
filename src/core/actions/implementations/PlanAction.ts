@@ -60,7 +60,7 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         return this.failure(`未知的类型: ${params.type}`);
       }
     } catch (error) {
-      logger.error('[PlanAction] 执行出错:', error);
+      logger.error('[PlanAction] 执行出错:', { error });
       return this.failure(`规划管理失败: ${error instanceof Error ? error.message : String(error)}`, error as Error);
     }
   }

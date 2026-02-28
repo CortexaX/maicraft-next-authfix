@@ -81,9 +81,12 @@ export class ContextManager {
       config,
       placeBlockUtils,
       movementUtils,
+      craftManager: undefined as unknown as CraftManager, // 延迟初始化
+      goalManager: undefined, // 延迟初始化
+      taskManager: undefined, // 延迟初始化
     };
 
-    return this.context;
+    return this.context!;
   }
 
   /**

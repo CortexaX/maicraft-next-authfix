@@ -6,7 +6,6 @@
 import { WebSocketServer as WSServer, WebSocket as WS } from 'ws';
 import { IncomingMessage } from 'http';
 import { getLogger } from '@/utils/Logger';
-import { getConfig } from '@/utils/Config';
 import { SubscriptionManager } from './SubscriptionManager';
 import { MessageHandler } from './MessageHandler';
 import { LogDataProvider } from './LogDataProvider';
@@ -164,7 +163,7 @@ export class WebSocketServer {
     this.logger.info(`新连接建立`, { connectionId, remoteAddress: request.socket?.remoteAddress });
 
     // 设置连接事件处理器
-    websocket.on('message', data => this.handleMessage(connectionId, data));
+    websocket.on('message', (data: Buffer) => this.handleMessage(connectionId, data));
     websocket.on('close', () => this.handleDisconnection(connectionId));
     websocket.on('error', error => this.handleConnectionError(connectionId, error));
     websocket.on('pong', () => this.handlePong(connectionId));

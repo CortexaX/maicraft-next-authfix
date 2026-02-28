@@ -286,9 +286,9 @@ export class Agent {
     try {
       await Promise.all([
         this.state.memory.saveAll(),
-        this.state.context.blockCache.save?.(),
-        this.state.context.containerCache.save?.(),
-        this.state.context.locationManager.save?.(),
+        this.state.context.blockCache.save(),
+        this.state.context.containerCache.save(),
+        this.state.context.locationManager.save(),
         this.state.context.goalManager?.save?.('./data'),
         this.state.context.taskManager?.save?.('./data'),
       ]);

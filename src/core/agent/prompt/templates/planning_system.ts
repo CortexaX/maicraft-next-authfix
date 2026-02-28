@@ -67,6 +67,7 @@ export function initPlanningSystemTemplate(): void {
 4. **修正机会**：如果发现任务设计不合理，可以在后续规划轮次中修改
 
 请仔细分析，给出合理的任务规划！`,
+      '',
       ['bot_name', 'plan_action', 'available_actions'],
     ),
   );

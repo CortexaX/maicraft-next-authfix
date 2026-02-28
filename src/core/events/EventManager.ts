@@ -103,8 +103,9 @@ export class EventManager {
       this.emit('blockUpdate', { oldBlock, newBlock });
     });
 
-    // 物品栏更新
-    this.bot.on('windowUpdate', (slot, oldItem, newItem) => {
+    // 物品栏更新 - 使用类型断言处理可能不存在的事件
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.bot as any).on?.('windowUpdate', (slot: number, oldItem: any, newItem: any) => {
       this.emit('windowUpdate', { slot, oldItem, newItem });
     });
 
@@ -117,8 +118,9 @@ export class EventManager {
       });
     });
 
-    // 天气变化
-    this.bot.on('weather', () => {
+    // 天气变化 - 使用类型断言处理可能不存在的事件
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this.bot as any).on?.('weather', () => {
       this.emit('weather', {
         isRaining: this.bot.isRaining,
         thunderState: this.bot.thunderState,

@@ -18,6 +18,8 @@ import type { Location } from '@/core/cache/LocationManager';
 import { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
 import { MovementUtils } from '@/utils/MovementUtils';
 import { CraftManager } from '@/core/crafting/CraftManager';
+import { BlockCache } from '@/core/cache/BlockCache';
+import { ContainerCache } from '@/core/cache/ContainerCache';
 
 /**
  * Logger 接口
@@ -34,20 +36,6 @@ export interface Logger {
  */
 export interface Config {
   [key: string]: any;
-}
-
-/**
- * 方块缓存接口（待实现）
- */
-export interface BlockCache {
-  // 后续实现
-}
-
-/**
- * 容器缓存接口（待实现）
- */
-export interface ContainerCache {
-  // 后续实现
 }
 
 /**

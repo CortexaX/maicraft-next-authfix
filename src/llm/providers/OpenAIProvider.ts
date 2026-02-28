@@ -7,16 +7,7 @@
 import { OpenAI as OpenAIClient } from 'openai';
 import { encoding_for_model, get_encoding } from 'tiktoken';
 import { Logger } from '@/utils/Logger';
-import {
-  LLMProvider,
-  LLMResponse,
-  LLMRequestConfig,
-  ChatMessage,
-  LLMError,
-  LLMProvider as ProviderType,
-  TokenUsage,
-  ValidatedLLMRequestConfig,
-} from '@/llm/types';
+import { LLMResponse, LLMRequestConfig, ChatMessage, LLMError, LLMProvider as ProviderType, ValidatedLLMRequestConfig } from '@/llm/types';
 import { OpenAIConfig, RetryConfig } from '@/llm/types';
 import { z } from 'zod';
 
@@ -148,8 +139,9 @@ export class OpenAIProvider implements ILLMProvider {
   /**
    * 流式聊天（当前不支持）
    */
-  async *streamChat(requestConfig: LLMRequestConfig): AsyncGenerator<LLMResponse, void, unknown> {
+  async *streamChat(_requestConfig: LLMRequestConfig): AsyncGenerator<LLMResponse, void, unknown> {
     throw new LLMError('Stream chat not implemented for OpenAI provider', 'NOT_IMPLEMENTED', ProviderType.OPENAI);
+    yield {} as LLMResponse;
   }
 
   /**
@@ -307,10 +299,10 @@ export class OpenAIProvider implements ILLMProvider {
       frequency_penalty: z.number().min(-2).max(2).optional(),
       presence_penalty: z.number().min(-2).max(2).optional(),
       stop: z.union([z.string(), z.array(z.string())]).optional(),
-      stream: z.boolean().optional(),
+      stream: z.boolean().default(false),
     });
 
-    return schema.parse(config);
+    return schema.parse(config) as ValidatedLLMRequestConfig;
   }
 
   /**

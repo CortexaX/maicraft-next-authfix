@@ -11,7 +11,6 @@
 import { Bot } from 'mineflayer';
 import { Vec3 } from 'vec3';
 import { Item } from 'prismarine-item';
-import { Entity } from 'prismarine-entity';
 import { getLogger, type Logger } from '@/utils/Logger';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
@@ -153,8 +152,9 @@ export class GameState {
       this.updateExperience(bot);
     });
 
-    // 监听物品栏变化 - 需要监听多个事件
-    bot.on('windowUpdate', () => {
+    // 监听物品栏变化 - 需要监听多个事件 (使用类型断言处理可能不存在的事件)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (bot as any).on?.('windowUpdate', () => {
       this.updateInventory(bot);
     });
 
@@ -172,7 +172,8 @@ export class GameState {
       this.timeOfDay = bot.time.timeOfDay;
     });
 
-    bot.on('weather', () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (bot as any).on?.('weather', () => {
       this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
     });
 
@@ -197,7 +198,7 @@ export class GameState {
   /**
    * 初始化缓存系统（依赖注入版本）
    */
-  private initializeCaches(bot: Bot): void {
+  private initializeCaches(_bot: Bot): void {
     try {
       // 缓存实例现在通过依赖注入提供，不在这里创建
       // 只需要加载缓存数据并启动缓存管理器
@@ -360,10 +361,11 @@ export class GameState {
     this.timeOfDay = bot.time.timeOfDay;
     this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
 
-    // 维度信息
-    if (bot.game.dimension === -1) {
+    // 维度信息 - 使用类型断言处理可能的枚举或字符串类型
+    const dim = bot.game.dimension as unknown;
+    if (dim === -1 || dim === 'minecraft:nether' || dim === 'nether') {
       this.dimension = 'nether';
-    } else if (bot.game.dimension === 1) {
+    } else if (dim === 1 || dim === 'minecraft:the_end' || dim === 'the_end') {
       this.dimension = 'end';
     } else {
       this.dimension = 'overworld';
@@ -601,11 +603,15 @@ export class GameState {
                 block: {
                   name: block.name,
                   type: block.type,
-                  metadata: block.metadata,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  metadata: (block as any).metadata,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   hardness: (block as any).hardness,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   lightLevel: (block as any).lightLevel,
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   transparent: (block as any).transparent,
-                },
+                } as any,
               });
             }
           }

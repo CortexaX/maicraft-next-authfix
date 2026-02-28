@@ -273,7 +273,7 @@ class MaicraftNext {
   /**
    * 处理断开连接
    */
-  private handleDisconnect(reason: string): void {
+  private handleDisconnect(_reason: string): void {
     if (this.isShuttingDown) {
       return;
     }
@@ -408,7 +408,7 @@ async function main(): Promise<void> {
   const app = new MaicraftNext();
 
   // 设置信号处理
-  const shutdownHandler = async (signal: string) => {
+  const shutdownHandler = async (_signal: string) => {
     try {
       await app.shutdown();
       process.exit(0);
@@ -424,17 +424,17 @@ async function main(): Promise<void> {
   // 捕获未处理的异常
   process.on('uncaughtException', error => {
     if (isMaiBotConnectionError(error)) {
-      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', undefined, error);
+      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', { error });
       return;
     }
-    basicErrorLogger.error('未捕获的异常', undefined, error);
+    basicErrorLogger.error('未捕获的异常', { error });
     app.shutdown().then(() => process.exit(1));
   });
 
-  process.on('unhandledRejection', (reason, promise) => {
+  process.on('unhandledRejection', (reason, _promise) => {
     const err = reason instanceof Error ? reason : new Error(String(reason));
     if (isMaiBotConnectionError(err)) {
-      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', undefined, err);
+      basicErrorLogger.warn('⚠️ MaiBot 连接错误（不影响主程序运行）', { error: err });
       return;
     }
     basicErrorLogger.error('未处理的Promise拒绝', undefined, err);

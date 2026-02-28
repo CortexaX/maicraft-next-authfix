@@ -155,17 +155,22 @@ export function initTemplates(): void {
 ## 🔄 使用流程
 
 ```typescript
-// 1. 初始化（在 MainDecisionLoop 构造函数中）
+// 1. 初始化（在 AgentLoop 构造函数中）
 initTemplates();
 
-// 2. 收集数据
-const inputData = this.getAllData();
+// 2. 收集数据（使用 PromptDataCollector）
+const dataCollector = new PromptDataCollector(state, actionPromptGenerator);
+const allData = dataCollector.collectAllData();
 
-// 3. 生成提示词
-const prompt = promptManager.generatePrompt('main_thinking', inputData);
+// 3. 构建上下文（使用 ContextBuilder）
+const contextBuilder = new ContextBuilder(state);
+const context = contextBuilder.buildContext();
 
-// 4. 调用 LLM
-const response = await this.llmManager.chat([{ role: 'user', content: prompt }]);
+// 4. 获取工具 Schema（使用 ToolRegistry）
+const toolSchemas = toolRegistry.getAvailableToolSchemas();
+
+// 5. LLM Function Calling
+const toolCalls = await llmManager.callTool(context.userPrompt, toolSchemas, context.systemPrompt);
 ```
 
 ## 📖 相关文档

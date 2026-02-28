@@ -63,6 +63,7 @@ export function initPlanningThinkingTemplate(): void {
 5. 说明任务的优先级和依赖关系
 
 现在开始你的规划！`,
+      '',
       ['current_goal', 'goal_history', 'task_list', 'inventory', 'position', 'health', 'planning_round', 'max_rounds'],
     ),
   );

@@ -10,7 +10,7 @@
 
 import { Action } from './Action';
 import { ActionId } from './ActionIds';
-import { ActionParamsMap, ActionResult, ExecuteOptions } from './types';
+import { ActionResult, ExecuteOptions } from './types';
 import { Logger } from '@/core/context/RuntimeContext';
 import { ContextManager } from '@/core/context/ContextManager';
 
@@ -54,7 +54,7 @@ export class ActionExecutor {
   /**
    * 执行动作（类型安全）
    */
-  async execute<T extends ActionId>(actionId: T, params: ActionParamsMap[T], _options?: ExecuteOptions): Promise<ActionResult> {
+  async execute<T extends ActionId>(actionId: T, params: Record<string, unknown>, _options?: ExecuteOptions): Promise<ActionResult> {
     const action = this.actions.get(actionId);
     if (!action) {
       const error = new Error(`动作 ${actionId} 未注册`);
@@ -74,7 +74,7 @@ export class ActionExecutor {
       const startTime = Date.now();
 
       // 执行动作
-      const result = await action.execute(context, params);
+      const result = await action.execute(context, params as any);
 
       const duration = Date.now() - startTime;
       context.logger.info(`动作执行${result.success ? '成功' : '失败'}: ${result.message} (耗时: ${duration}ms)`);
