@@ -9,7 +9,7 @@
 import { BaseAction } from '@/core/actions/Action';
 import { RuntimeContext } from '@/core/context/RuntimeContext';
 import { ActionResult, BaseActionParams } from '@/core/actions/types';
-import { MovementUtils, GoalType } from '@/utils/MovementUtils';
+import { GoalType } from '@/utils/MovementUtils';
 import { Vec3 } from 'vec3';
 import { promptManager } from '@/core/agent/prompt/prompt_manager';
 
@@ -397,9 +397,9 @@ export abstract class ContainerInteractAction<P extends ContainerInteractParams 
    */
   protected getCurrentGoal(context: RuntimeContext): string {
     if (context.goalManager) {
-      const goals = context.goalManager.getActiveGoals?.() || [];
+      const goals = context.goalManager.getActiveGoals() || [];
       if (goals.length > 0) {
-        return `当前目标: ${goals[0].name || goals[0].description || '未知目标'}`;
+        return `当前目标: ${goals[0].content || '未知目标'}`;
       }
     }
     return '当前无特定目标';
@@ -408,14 +408,7 @@ export abstract class ContainerInteractAction<P extends ContainerInteractParams 
   /**
    * 获取当前任务
    */
-  protected getCurrentTasks(context: RuntimeContext): string {
-    if (context.goalManager) {
-      const tasks = context.goalManager.getActiveTasks?.() || [];
-      if (tasks.length > 0) {
-        const taskStrs = tasks.slice(0, 3).map((t: any) => t.name || t.description || '未知任务');
-        return `当前任务: ${taskStrs.join(', ')}`;
-      }
-    }
+  protected getCurrentTasks(_context: RuntimeContext): string {
     return '当前无特定任务';
   }
 

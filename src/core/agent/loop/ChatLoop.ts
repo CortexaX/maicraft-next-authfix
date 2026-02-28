@@ -5,17 +5,18 @@
 import type { AgentState } from '@/core/agent/types';
 import type { ConversationEntry } from '@/core/agent/memory/types';
 import type { LLMClientResponse } from '@/llm/LLMManager';
+import type { LLMManager } from '@/llm/LLMManager';
 import { promptManager } from '@/core/agent/prompt';
 import { ActionIds } from '@/core/actions/ActionIds';
 import { BaseLoop } from './BaseLoop';
 
 export class ChatLoop extends BaseLoop<AgentState> {
-  private llmManager: any; // LLMManager type
+  private llmManager: LLMManager;
 
   private activeValue: number = 5;
   private selfTriggered: boolean = false;
 
-  constructor(state: AgentState, llmManager: any) {
+  constructor(state: AgentState, llmManager: LLMManager) {
     super(state, 'ChatLoop');
 
     // 必须传入 llmManager，不允许创建新实例
@@ -30,7 +31,7 @@ export class ChatLoop extends BaseLoop<AgentState> {
    * 设置聊天监听器
    */
   private setupChatListener(): void {
-    this.state.context.events.on('chat', (data: any) => {
+    this.state.context.events.on('chat', (data: { username: string; message: string }) => {
       // 获取机器人用户名，用于过滤自己的消息
       const botUsername = this.state.config.minecraft.username || this.state.context.gameState.playerName;
 

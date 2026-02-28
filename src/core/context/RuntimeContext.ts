@@ -10,6 +10,7 @@ import { CraftManager } from '@/core/crafting/CraftManager';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
 import type { LLMManager } from '@/llm/LLMManager';
+import type { GoalManager } from '@/core/agent/planning/goal/GoalManager';
 
 export interface Logger {
   debug(message: string, ...args: any[]): void;
@@ -63,7 +64,7 @@ export interface RuntimeContext {
   movementUtils: MovementUtils;
   craftManager: CraftManager;
 
-  goalManager: any;
+  goalManager: GoalManager;
 
   llmManager?: LLMManager;
 }

@@ -4,10 +4,12 @@
  */
 
 import { Bot } from 'mineflayer';
+import { Block } from 'prismarine-block';
 import { Vec3 } from 'vec3';
 import { getLogger, type Logger } from '@/utils/Logger';
 import type { BlockCache } from './BlockCache';
 import type { ContainerCache } from './ContainerCache';
+import type { ContainerType } from './types';
 
 export interface CacheManagerConfig {
   /** 方块扫描间隔（毫秒） */
@@ -143,9 +145,9 @@ export class CacheManager {
                     name: block.name || 'unknown',
                     type: block.type,
                     metadata: block.metadata,
-                    hardness: (block as any).hardness,
-                    lightLevel: (block as any).lightLevel,
-                    transparent: (block as any).transparent,
+                    hardness: block.hardness,
+                    lightLevel: block.lightLevel,
+                    transparent: block.transparent,
                     state: this.getBlockState(block),
                     canSee,
                   },
@@ -484,9 +486,9 @@ export class CacheManager {
                         name: block.name || 'unknown',
                         type: block.type,
                         metadata: block.metadata,
-                        hardness: (block as any).hardness,
-                        lightLevel: (block as any).lightLevel,
-                        transparent: (block as any).transparent,
+                        hardness: block.hardness,
+                        lightLevel: block.lightLevel,
+                        transparent: block.transparent,
                         state: this.getBlockState(block),
                       },
                     });
@@ -537,8 +539,8 @@ export class CacheManager {
   /**
    * 获取方块状态
    */
-  private getBlockState(block: any): Record<string, any> {
-    const state: Record<string, any> = {};
+  private getBlockState(block: Block): Record<string, unknown> {
+    const state: Record<string, unknown> = {};
 
     try {
       // 获取方块的状态信息
@@ -565,7 +567,7 @@ export class CacheManager {
   /**
    * 获取方块朝向
    */
-  private getBlockFacing(block: any): string {
+  private getBlockFacing(block: Block): string {
     // 简化的朝向判断，可以根据 metadata 确定
     const metadata = block.metadata || 0;
     const directions = ['north', 'east', 'south', 'west'];
@@ -575,7 +577,7 @@ export class CacheManager {
   /**
    * 判断方块是否开启
    */
-  private isBlockOpen(block: any): boolean {
+  private isBlockOpen(block: Block): boolean {
     // 简化的开启状态判断
     const metadata = block.metadata || 0;
     return (metadata & 0x4) !== 0; // 通常第3位表示开启状态
@@ -585,7 +587,7 @@ export class CacheManager {
    * 从方块列表中同步容器到ContainerCache
    * 🔧 修复：确保BlockCache和ContainerCache实时同步
    */
-  private syncContainersFromBlocks(blocks: Array<{ x: number; y: number; z: number; block: any }>, centerPos: Vec3): void {
+  private syncContainersFromBlocks(blocks: Array<{ x: number; y: number; z: number; block: Block }>, centerPos: Vec3): void {
     if (!this.containerCache) return;
 
     const containerTypes = ['chest', 'furnace', 'brewing_stand', 'dispenser', 'hopper', 'shulker_box'];
@@ -596,7 +598,7 @@ export class CacheManager {
 
       // 检查是否是容器类型
       if (containerTypes.some(type => blockName.includes(type))) {
-        const containerType = this.getContainerType({ name: blockName });
+        const containerType = this.getContainerTypeByName(blockName);
 
         if (containerType) {
           // 计算距离
@@ -659,7 +661,7 @@ export class CacheManager {
 
           // 记录容器位置，但不实际打开（避免干扰游戏）
           this.containerCache.setContainer(pos.x, pos.y, pos.z, containerType, {
-            type: containerType as any,
+            type: containerType,
             position: pos,
             lastAccessed: Date.now(),
           });
@@ -754,8 +756,22 @@ export class CacheManager {
   /**
    * 获取容器类型
    */
-  private getContainerType(block: any): string | null {
+  private getContainerType(block: Block): ContainerType | null {
     const name = block.name.toLowerCase();
+    if (name.includes('chest')) return 'chest';
+    if (name.includes('furnace')) return 'furnace';
+    if (name.includes('brewing')) return 'brewing_stand';
+    if (name.includes('dispenser')) return 'dispenser';
+    if (name.includes('hopper')) return 'hopper';
+    if (name.includes('shulker')) return 'shulker_box';
+    return null;
+  }
+
+  /**
+   * 根据方块名称获取容器类型
+   */
+  private getContainerTypeByName(blockName: string): ContainerType | null {
+    const name = blockName.toLowerCase();
     if (name.includes('chest')) return 'chest';
     if (name.includes('furnace')) return 'furnace';
     if (name.includes('brewing')) return 'brewing_stand';

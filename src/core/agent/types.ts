@@ -4,9 +4,15 @@
 
 import type { RuntimeContext } from '@/core/context/RuntimeContext';
 import type { MemoryManager } from './memory/MemoryManager';
+import type { LLMManager } from '@/llm/LLMManager';
 import type { AppConfig as Config } from '@/utils/Config';
 import type { ToolRegistry } from './tool/ToolRegistry';
 import type { InterruptManager } from '@/core/interrupt';
+import type { GameState } from '@/core/state/GameState';
+import type { BlockCache } from '@/core/cache/BlockCache';
+import type { ContainerCache } from '@/core/cache/ContainerCache';
+import type { LocationManager } from '@/core/cache/LocationManager';
+import type { Logger } from '@/utils/Logger';
 
 /**
  * Agent 共享状态
@@ -19,7 +25,7 @@ export interface AgentState {
   readonly context: RuntimeContext;
 
   readonly memory: MemoryManager;
-  readonly llmManager: any;
+  readonly llmManager: LLMManager;
 
   readonly interruptManager: InterruptManager;
   readonly toolRegistry?: ToolRegistry;
@@ -34,7 +40,7 @@ export interface AgentStatus {
   isRunning: boolean;
   currentMode: string;
   goal: string;
-  currentTask: any; // Task 类型
+  currentTask: unknown;
   interrupted: boolean;
   interruptReason: string;
 }
@@ -44,16 +50,16 @@ export interface AgentStatus {
  */
 export interface ActionCall {
   actionType: string;
-  params: Record<string, any>;
+  params: Record<string, unknown>;
 }
 
 /**
  * 游戏上下文（用于追踪器和任务系统）
  */
 export interface GameContext {
-  gameState: any; // GameState 类型
-  blockCache: any; // BlockCache 类型
-  containerCache: any; // ContainerCache 类型
-  locationManager: any; // LocationManager 类型
-  logger: any; // Logger 类型
+  gameState: GameState;
+  blockCache: BlockCache;
+  containerCache: ContainerCache;
+  locationManager: LocationManager;
+  logger: Logger;
 }

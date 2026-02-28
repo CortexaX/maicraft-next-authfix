@@ -30,7 +30,7 @@ export type EquipmentSlot = 'head' | 'torso' | 'legs' | 'feet' | 'hand' | 'off-h
 export class GameState {
   private logger: Logger;
 
-  readonly playerName: string = '';
+  playerName: string = '';
   gamemode: string = 'survival';
 
   position: Vec3 = new Vec3(0, 0, 0);
@@ -53,8 +53,12 @@ export class GameState {
 
   weather: string = 'clear';
   timeOfDay: number = 0;
+  time: number = 0;
   dimension: string = 'overworld';
   biome: string = 'plains';
+  lightLevel: number = 0;
+  isRaining: boolean = false;
+  isThundering: boolean = false;
 
   nearbyEntities: EntityInfo[] = [];
   entitySearchDistance: number = 16;
@@ -97,7 +101,7 @@ export class GameState {
     }
 
     // 设置玩家名称
-    (this as any).playerName = bot.username;
+    this.playerName = bot.username;
 
     this.startCacheSystem();
 
@@ -126,6 +130,8 @@ export class GameState {
       this.updateExperience(bot);
     });
 
+    // windowUpdate 和 weather 是 mineflayer 的运行时事件，类型定义中不存在
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (bot as any).on?.('windowUpdate', () => {
       this.updateInventory(bot);
     });
@@ -142,6 +148,7 @@ export class GameState {
       this.timeOfDay = bot.time.timeOfDay;
     });
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (bot as any).on?.('weather', () => {
       this.weather = bot.thunderState ? 'thunder' : bot.isRaining ? 'rain' : 'clear';
     });
@@ -304,8 +311,8 @@ export class GameState {
     // 生物群系（如果可用）
     try {
       const block = bot.blockAt(this.blockPosition);
-      if (block && (block as any).biome) {
-        this.biome = (block as any).biome.name || 'unknown';
+      if (block && block.biome) {
+        this.biome = block.biome.name || 'unknown';
       }
     } catch (error) {
       // 忽略错误，使用默认值
@@ -331,8 +338,8 @@ export class GameState {
           name: entity.name || entity.displayName || 'unknown',
           position: entity.position.clone(),
           distance,
-          health: (entity as any).health,
-          maxHealth: (entity as any).maxHealth,
+          health: entity.health,
+          maxHealth: entity.maxHealth,
         });
       }
     }
@@ -347,9 +354,9 @@ export class GameState {
     return {
       name: item.name,
       count: item.count,
-      slot: (item as any).slot || 0,
+      slot: item.slot || 0,
       displayName: item.displayName || item.name,
-      metadata: (item as any).metadata,
+      metadata: item.metadata,
     };
   }
 
@@ -476,15 +483,11 @@ export class GameState {
                 block: {
                   name: block.name,
                   type: block.type,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  metadata: (block as any).metadata,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  hardness: (block as any).hardness,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  lightLevel: (block as any).lightLevel,
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  transparent: (block as any).transparent,
-                } as any,
+                  metadata: block.metadata,
+                  hardness: block.hardness,
+                  lightLevel: block.lightLevel,
+                  transparent: block.transparent,
+                },
               });
             }
           }

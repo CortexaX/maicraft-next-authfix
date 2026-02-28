@@ -22,6 +22,7 @@ import { ActionPromptGenerator } from '@/core/actions/ActionPromptGenerator';
 import { ToolRegistry } from './tool/ToolRegistry';
 import { InterruptManager } from '@/core/interrupt';
 import { CombatHandler } from '@/core/interrupt/handlers/CombatHandler';
+import type { LLMManager } from '@/llm/LLMManager';
 
 export class Agent {
   // 共享状态（只读）
@@ -41,7 +42,7 @@ export class Agent {
   // 外部传入的组件
   private bot: Bot;
   private executor: ActionExecutor;
-  private llmManager: any; // LLMManager 类型
+  private llmManager: LLMManager;
   private externalLogger: Logger;
 
   // 生命周期
@@ -52,7 +53,7 @@ export class Agent {
   constructor(
     bot: Bot,
     executor: ActionExecutor,
-    llmManager: any,
+    llmManager: LLMManager,
     config: Config,
     memory: MemoryManager,
     interruptManager: InterruptManager,

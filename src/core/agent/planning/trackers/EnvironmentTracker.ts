@@ -21,11 +21,11 @@ export class EnvironmentTracker implements Tracker {
   checkCompletion(context: GameContext): boolean {
     // 检查时间
     if (this.timeOfDay) {
-      const time = context.gameState.time?.timeOfDay ?? 0;
-      if (this.timeOfDay.min !== undefined && time < this.timeOfDay.min) {
+      const gameTime = context.gameState.timeOfDay;
+      if (this.timeOfDay.min !== undefined && gameTime < this.timeOfDay.min) {
         return false;
       }
-      if (this.timeOfDay.max !== undefined && time > this.timeOfDay.max) {
+      if (this.timeOfDay.max !== undefined && gameTime > this.timeOfDay.max) {
         return false;
       }
     }
@@ -71,12 +71,12 @@ export class EnvironmentTracker implements Tracker {
   getProgress(context: GameContext): TrackerProgress {
     let current = 0;
     let target = 0;
-    let descriptions: string[] = [];
+    const descriptions: string[] = [];
 
     // 时间进度
     if (this.timeOfDay) {
       target++;
-      const time = context.gameState.time?.timeOfDay ?? 0;
+      const time = context.gameState.timeOfDay;
       const minTime = this.timeOfDay.min ?? 0;
       const maxTime = this.timeOfDay.max ?? 24000;
 

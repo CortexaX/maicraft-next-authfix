@@ -3,6 +3,7 @@
  */
 
 import type { GameContext } from '@/core/agent/types';
+import type { Goal as GoalClass } from './goal/Goal';
 
 /**
  * 任务进度
@@ -42,10 +43,25 @@ export interface TaskTracker {
   /**
    * 序列化（用于保存）
    */
-  toJSON(): any;
+  toJSON(): unknown;
 }
 
 /**
  * 目标状态
  */
 export type GoalStatus = 'active' | 'completed' | 'abandoned' | 'failed';
+
+/**
+ * 目标接口
+ */
+export type Goal = GoalClass;
+
+/**
+ * 任务接口
+ */
+export interface Task {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly tracker?: TaskTracker;
+}

@@ -17,7 +17,22 @@ export interface BlockInfo {
   position: Vec3;
   /** 缓存时间戳 */
   timestamp: number;
+  /** 方块元数据 */
+  metadata?: number;
+  /** 方块硬度 */
+  hardness?: number;
+  /** 方块亮度 */
+  lightLevel?: number;
+  /** 是否透明 */
+  transparent?: boolean;
+  /** 方块状态 */
+  state?: Record<string, unknown>;
 }
+
+/**
+ * 容器类型
+ */
+export type ContainerType = 'chest' | 'furnace' | 'brewing_stand' | 'dispenser' | 'hopper' | 'shulker_box';
 
 /**
  * 容器信息接口
@@ -25,7 +40,7 @@ export interface BlockInfo {
  */
 export interface ContainerInfo {
   /** 容器类型 */
-  type: 'chest' | 'furnace' | 'brewing_stand' | 'dispenser' | 'hopper' | 'shulker_box';
+  type: ContainerType;
   /** 容器位置 */
   position: Vec3;
   /** 容器名称 (自定义名称) */
