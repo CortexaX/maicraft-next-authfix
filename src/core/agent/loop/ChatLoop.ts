@@ -124,7 +124,8 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const userPrompt = promptManager.generatePrompt('chat_response', {
         player_name: this.state.context.gameState.playerName || 'Bot',
         recent_conversations: conversationText,
-        current_activity: '空闲中', // 新系统中不再有单一currentTask
+        current_activity: this.getCurrentActivity(),
+        agent_context: this.getAgentContextSummary(),
         position: `位置: (${this.state.context.gameState.blockPosition.x}, ${this.state.context.gameState.blockPosition.y}, ${this.state.context.gameState.blockPosition.z})`,
       });
 
@@ -163,7 +164,8 @@ export class ChatLoop extends BaseLoop<AgentState> {
       const userPrompt = promptManager.generatePrompt('chat_initiate', {
         player_name: this.state.context.gameState.playerName || 'Bot',
         recent_conversations: conversationText,
-        current_activity: '空闲中', // 新系统中不再有单一currentTask
+        current_activity: this.getCurrentActivity(),
+        agent_context: this.getAgentContextSummary(),
         position: `位置: (${this.state.context.gameState.blockPosition.x}, ${this.state.context.gameState.blockPosition.y}, ${this.state.context.gameState.blockPosition.z})`,
       });
 
@@ -215,5 +217,31 @@ export class ChatLoop extends BaseLoop<AgentState> {
       // 如果都不是，直接返回原文
       return content.trim();
     }
+  }
+
+  /**
+   * 从 TaskManager/GoalManager 动态读取当前活动
+   */
+  private getCurrentActivity(): string {
+    const goalManager = this.state.context.goalManager;
+    const taskManager = this.state.context.taskManager;
+    const currentGoal = goalManager?.getCurrentGoal();
+    if (!currentGoal) return '无特定目标，自由探索中';
+
+    const activeTasks = taskManager?.getActiveTasks(currentGoal.id) || [];
+    const inProgress = activeTasks.find((t: any) => t.status === 'in_progress');
+    if (inProgress) return `正在执行: ${inProgress.content}（目标: ${currentGoal.content}）`;
+    if (activeTasks.length > 0) return `计划中: ${activeTasks[0].content}（目标: ${currentGoal.content}）`;
+    return `目标: ${currentGoal.content}（暂无具体任务）`;
+  }
+
+  /**
+   * 利用已有的 buildContextSummary() 方法获取 Agent 上下文
+   */
+  private getAgentContextSummary(): string {
+    return this.state.memory.buildContextSummary({
+      includeThoughts: 3,
+      includeDecisions: 5,
+    });
   }
 }
