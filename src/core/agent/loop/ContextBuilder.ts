@@ -64,8 +64,8 @@ export class ContextBuilder {
     }
 
     // 有目标但无任务的提示
-    if (this.hasGoalButNoTasks()) {
-      parts.push('\n💡 提示：你有目标但没有任务，考虑使用 plan_action 工具来规划具体任务。');
+    if (this.hasGoalButNoPlan()) {
+      parts.push('\n💡 提示：你有目标但没有执行计划，考虑使用 plan_action 工具的 update_plan 操作来制定计划。');
     }
 
     return parts.join('\n');
@@ -128,13 +128,11 @@ export class ContextBuilder {
     return gameState.food / gameState.foodMax < 0.3;
   }
 
-  private hasGoalButNoTasks(): boolean {
+  private hasGoalButNoPlan(): boolean {
     const goalManager = this.state.context.goalManager;
-    const taskManager = this.state.context.taskManager;
     const currentGoal = goalManager?.getCurrentGoal();
     if (!currentGoal) return false;
-    const activeTasks = taskManager?.getActiveTasks(currentGoal.id) || [];
-    return activeTasks.length === 0;
+    return !currentGoal.plan;
   }
 
   private formatBasicInfo(baseInfo: any): string {
@@ -181,21 +179,14 @@ export class ContextBuilder {
 
   private getGoalAndTaskSummary(): string {
     const goalManager = this.state.context.goalManager;
-    const taskManager = this.state.context.taskManager;
     const currentGoal = goalManager?.getCurrentGoal();
 
     if (!currentGoal) {
       return '当前没有活动目标。使用 plan_action 工具创建目标。';
     }
 
-    const activeTasks = taskManager?.getActiveTasks(currentGoal.id) || [];
-    const taskLines = activeTasks.slice(0, 5).map((t: any) => {
-      const status = t.status === 'completed' ? '✅' : t.status === 'in_progress' ? '🔄' : '⏳';
-      return `  ${status} ${t.content}`;
-    });
+    const planSection = currentGoal.plan ? `\n计划: ${currentGoal.plan}` : '\n计划: 暂无执行计划';
 
-    return `目标: ${currentGoal.content}
-任务:
-${taskLines.length > 0 ? taskLines.join('\n') : '  暂无任务'}`;
+    return `目标: ${currentGoal.content}${planSection}`;
   }
 }
