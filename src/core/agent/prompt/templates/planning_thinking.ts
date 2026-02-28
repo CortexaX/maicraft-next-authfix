@@ -13,7 +13,7 @@ export function initPlanningThinkingTemplate(): void {
       'planning_thinking',
       `# 当前规划任务
 
-你需要为以下目标制定具体的任务计划：
+你需要为以下目标制定执行计划：
 
 ## 目标状态
 
@@ -25,8 +25,8 @@ export function initPlanningThinkingTemplate(): void {
 
 ## 当前状态
 
-**已有任务**：
-{task_list}
+**当前计划**：
+{current_plan}
 
 **库存物品**：
 {inventory}
@@ -45,26 +45,25 @@ export function initPlanningThinkingTemplate(): void {
 
 **重要提醒**：
 - 查看目标历史，了解最近完成的目标和新创建的目标
-- 如果当前目标是刚创建的，通常只需要为其创建任务，而不是创建新目标
-- 专注于为当前活动目标制定具体的执行任务
+- 如果当前目标是刚创建的，使用 \`operation="update_plan"\` 为其添加执行计划
+- 专注于为当前活动目标制定清晰的执行步骤
 
-**注意**：
-1. 如果已有任务列表不为空，请评估现有任务是否足够完成当前目标
-2. 如果现有任务已经足够，可以不创建新任务（或只做微调）
-3. 如果需要补充任务，请创建具体、可执行的任务
-4. 每个任务应该尽可能简单，理想情况下用一个动作就能完成
-5. 务必为任务设置合适的Tracker，以便自动检测完成
-
-**思考步骤**：
+**计划设计建议**：
 1. 分析目标的具体含义和完成条件
 2. 评估当前状态（库存、位置、健康）
-3. 判断已有任务是否足够
-4. 如果需要，创建新的任务并设置Tracker
-5. 说明任务的优先级和依赖关系
+3. 用自然语言描述执行步骤，例如：
+   - "1. 寻找附近的树木 2. 收集20个橡木原木 3. 制作工作台"
+4. 如果目标有Tracker，确保计划能触发Tracker检测
+5. 计划应该简洁明了，每个步骤都可用现有动作完成
+
+**注意**：
+- 如果已有执行计划且仍然有效，可以不更新
+- 如果需要调整计划，使用 \`operation="update_plan"\` 更新
+- 每个步骤应该简单明确，避免过于复杂的描述
 
 现在开始你的规划！`,
       '',
-      ['current_goal', 'goal_history', 'task_list', 'inventory', 'position', 'health', 'planning_round', 'max_rounds'],
+      ['current_goal', 'goal_history', 'current_plan', 'inventory', 'position', 'health', 'planning_round', 'max_rounds'],
     ),
   );
 }

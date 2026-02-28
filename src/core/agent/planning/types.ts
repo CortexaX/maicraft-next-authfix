@@ -46,16 +46,6 @@ export interface TaskTracker {
 }
 
 /**
- * 任务状态
- */
-export type TaskStatus = 'pending' | 'active' | 'completed' | 'failed';
-
-/**
- * 计划状态
- */
-export type PlanStatus = 'active' | 'completed' | 'abandoned';
-
-/**
  * 目标状态
  */
 export type GoalStatus = 'active' | 'completed' | 'abandoned' | 'failed';
