@@ -7,7 +7,7 @@ import { promises as fs } from 'fs';
 import { Vec3 } from 'vec3';
 import { getLogger } from '@/utils/Logger';
 import type { Logger } from '@/utils/Logger';
-import type { ContainerInfo, ContainerItem, CacheConfig, CacheStats, ContainerKeyGenerator } from './types';
+import type { ContainerInfo, CacheConfig, CacheStats, ContainerKeyGenerator } from './types';
 
 export class ContainerCache {
   private cache: Map<string, ContainerInfo> = new Map();
@@ -151,31 +151,6 @@ export class ContainerCache {
   }
 
   /**
-   * 更新容器物品
-   */
-  updateContainerItems(x: number, y: number, z: number, type: string, items: ContainerItem[]): void {
-    this.logger.warn('updateContainerItems 已禁用：容器不再缓存物品信息');
-  }
-
-  /**
-   * 🔧 已禁用：添加物品到容器
-   * 原因：不再存储物品信息以减少内存占用
-   */
-  addItemToContainer(x: number, y: number, z: number, type: string, item: ContainerItem): boolean {
-    this.logger.warn('addItemToContainer 已禁用：容器不再缓存物品信息');
-    return false;
-  }
-
-  /**
-   * 🔧 已禁用：从容器移除物品
-   * 原因：不再存储物品信息以减少内存占用
-   */
-  removeItemFromContainer(x: number, y: number, z: number, type: string, itemId: number, count: number = 1): boolean {
-    this.logger.warn('removeItemFromContainer 已禁用：容器不再缓存物品信息');
-    return false;
-  }
-
-  /**
    * 删除容器缓存
    */
   removeContainer(x: number, y: number, z: number, type: string): boolean {
@@ -206,7 +181,7 @@ export class ContainerCache {
   getContainersInRadius(centerX: number, centerY: number, centerZ: number, radius: number): ContainerInfo[] {
     const containers: ContainerInfo[] = [];
 
-    for (const [key, containerInfo] of this.cache) {
+    for (const containerInfo of this.cache.values()) {
       if (this.isExpired(containerInfo)) {
         continue;
       }
@@ -263,24 +238,6 @@ export class ContainerCache {
     }
 
     return containers;
-  }
-
-  /**
-   * 🔧 已禁用：按物品查找容器
-   * 原因：不再存储物品信息以减少内存占用，请使用 bot.openContainer() 实时查询
-   */
-  findContainersWithItem(itemId: number, minCount: number = 1): ContainerInfo[] {
-    this.logger.warn('findContainersWithItem 已禁用：容器不再缓存物品信息，请使用 bot.openContainer() 实时查询');
-    return [];
-  }
-
-  /**
-   * 🔧 已禁用：按物品名称查找容器
-   * 原因：不再存储物品信息以减少内存占用，请使用 bot.openContainer() 实时查询
-   */
-  findContainersWithItemName(itemName: string, minCount: number = 1): ContainerInfo[] {
-    this.logger.warn('findContainersWithItemName 已禁用：容器不再缓存物品信息，请使用 bot.openContainer() 实时查询');
-    return [];
   }
 
   /**
@@ -415,17 +372,17 @@ export class ContainerCache {
 
       // 🔧 重建区块索引
       this.chunkIndex.clear();
-      for (const [key, containerInfo] of this.cache) {
+      for (const [_key, containerInfo] of this.cache) {
         const chunkKey = this.getChunkKey(containerInfo.position.x, containerInfo.position.z);
         if (!this.chunkIndex.has(chunkKey)) {
           this.chunkIndex.set(chunkKey, new Set());
         }
-        this.chunkIndex.get(chunkKey)!.add(key);
+        this.chunkIndex.get(chunkKey)!.add(_key);
       }
 
       this.logger.info(`ContainerCache 加载完成，已加载 ${this.cache.size} 个容器缓存，区块索引 ${this.chunkIndex.size} 个区块`);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
         this.logger.info('ContainerCache 文件不存在，跳过加载');
       } else {
         this.logger.error('加载 ContainerCache 失败', undefined, error as Error);
