@@ -15,6 +15,7 @@ import { LLMHistoryLogger } from './LLMHistoryLogger';
 import { HistoryCompressor } from './HistoryCompressor';
 import { SemanticCompressor, type HistoryEntry } from './SemanticCompressor';
 import type { ToolCall } from '@/llm/types';
+import type { ThoughtEntry } from '@/core/agent/memory/types';
 
 interface HistoryMessage {
   role: 'assistant' | 'tool';
@@ -112,6 +113,23 @@ export class AgentLoop extends BaseLoop<AgentState> {
       const llmResponse = await this.llmManager.callToolWithHistory(messages, toolSchemas, { signal });
       const toolCalls = llmResponse?.tool_calls ?? [];
       const llmContentForAssistant = llmResponse?.content ?? null;
+
+      // 保存 LLM 思考内容到 ThoughtMemory
+      if (llmContentForAssistant) {
+        const thoughtEntry: ThoughtEntry = {
+          id: `thought-${Date.now()}`,
+          content: llmContentForAssistant,
+          timestamp: Date.now(),
+          context: { loopCount: this.loopCount },
+        };
+        try {
+          await this.state.memory.internal.thought.add(thoughtEntry);
+        } catch (e) {
+          this.logger.error('保存思考内容到 ThoughtMemory 失败', { error: (e as Error).message });
+        }
+      } else {
+        this.logger.warn('⚠️ LLM 返回空思考内容');
+      }
 
       if (!toolCalls || toolCalls.length === 0) {
         this.logger.warn('⚠️ LLM 没有调用任何工具！');
