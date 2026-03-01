@@ -24,6 +24,7 @@ import { ToolRegistry } from './tool/ToolRegistry';
 import { InterruptManager } from '@/core/interrupt';
 import { CombatHandler } from '@/core/interrupt/handlers/CombatHandler';
 import type { LLMManager } from '@/llm/LLMManager';
+import { initAllTemplates } from './prompt';
 
 export class Agent {
   // 共享状态（只读）
@@ -123,6 +124,9 @@ export class Agent {
     this.logger.info('🔧 Agent 初始化中...');
 
     try {
+      // 初始化所有提示词模板
+      initAllTemplates();
+
       // 初始化游戏状态（如果还没初始化）
       if (!(this.state.context.gameState as any).initialized) {
         this.state.context.gameState.initialize(this.state.context.bot, this.state.context.events);

@@ -500,7 +500,21 @@ export class ConfigManager extends EventEmitter {
       logging: {},
       minecraft: {},
       agent: {},
+      llm: {
+        default_provider: 'openai',
+        openai: {},
+        azure: {},
+        anthropic: {},
+        retry: {},
+        usage_tracking: {},
+        pricing: {
+          openai: {},
+          anthropic: {},
+          azure: {},
+        },
+      },
       plugins: {},
+      maibot: {},
       cache: {},
       advanced: {},
     });
