@@ -109,7 +109,9 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
       messages = this.buildMessages(context.systemPrompt, context.userPrompt);
 
-      const toolCalls = await this.llmManager.callToolWithHistory(messages, toolSchemas, { signal });
+      const llmResponse = await this.llmManager.callToolWithHistory(messages, toolSchemas, { signal });
+      const toolCalls = llmResponse?.tool_calls ?? [];
+      const llmContentForAssistant = llmResponse?.content ?? null;
 
       if (!toolCalls || toolCalls.length === 0) {
         this.logger.warn('⚠️ LLM 没有调用任何工具！');
@@ -122,7 +124,7 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
       const assistantEntry: HistoryMessage = {
         role: 'assistant',
-        content: '[调用工具]',
+        content: llmContentForAssistant ?? '[调用工具]',
         tool_calls: toolCalls,
       };
       this.conversationHistory.push(assistantEntry);

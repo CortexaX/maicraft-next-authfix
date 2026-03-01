@@ -193,10 +193,10 @@ export class LLMManager {
     messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
     tools: any[],
     options?: Partial<LLMRequestConfig>,
-  ): Promise<ToolCall[] | null> {
+  ): Promise<{ content: string | null; tool_calls: ToolCall[] | null }> {
     if (!this.isActive) {
       this.logger.error('LLM客户端未激活');
-      return null;
+      return { content: null, tool_calls: null };
     }
 
     try {
@@ -221,20 +221,24 @@ export class LLMManager {
 
       this.usageTracker.recordUsage(this.activeProvider!.provider, response.model, response.usage);
 
-      if (response.choices[0]?.message?.tool_calls) {
+      const content = response.choices[0]?.message?.content ?? null;
+      const tool_calls: ToolCall[] | null = response.choices[0]?.message?.tool_calls ?? null;
+
+      if (tool_calls) {
         this.logger.info('✅ LLM 返回工具调用（带历史）', {
-          tool_count: response.choices[0].message.tool_calls.length,
-          tools: response.choices[0].message.tool_calls.map((tc: any) => tc.function.name),
+          tool_count: tool_calls.length,
+          tools: tool_calls.map((tc: any) => tc.function.name),
         });
-        return response.choices[0].message.tool_calls;
+      }
+      if (!tool_calls) {
+        this.logger.warn('⚠️ LLM 没有返回工具调用（带历史）');
       }
 
-      this.logger.warn('⚠️ LLM 没有返回工具调用（带历史）');
-      return null;
+      return { content, tool_calls };
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       this.logger.error('带历史的工具调用失败', { error: errorMessage });
-      return null;
+      return { content: null, tool_calls: null };
     }
   }
 
