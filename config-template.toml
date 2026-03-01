@@ -17,6 +17,7 @@ colors = true            # 启用控制台彩色输出
 max_file_size = 10485760 # 10MB
 max_files = 5
 log_dir = "./logs"
+file_format = "jsonl"    # jsonl（每行一个JSON对象，适合机器解析）或 text（纯文本，适合人类阅读）
 
 [minecraft]
 # Minecraft 服务器连接配置
@@ -180,14 +181,14 @@ allow_headers = ["*"]
 # 方块缓存采用基于区块的事件驱动机制，性能优异
 
 # 方块缓存配置
-only_visible_blocks = true   # 是否只缓存可见方块（推荐开启，更拟人且节省内存）
-enable_auto_save = false     # 是否启用容器持久化
+only_visible_blocks = true # 是否只缓存可见方块（推荐开启，更拟人且节省内存）
+enable_auto_save = false   # 是否启用容器持久化
 
 # 容器缓存容量配置（0表示无限制）
-max_container_entries = 0    # 最大容器缓存条目数（0=无限制）
+max_container_entries = 0 # 最大容器缓存条目数（0=无限制）
 
 # 容器过期时间配置（0表示永不过期）
-container_expiration_time = 0  # 容器缓存过期时间（毫秒，0=永不过期）
+container_expiration_time = 0 # 容器缓存过期时间（毫秒，0=永不过期）
 
 [maibot]
 # MaiBot 通信配置 (使用 Router)

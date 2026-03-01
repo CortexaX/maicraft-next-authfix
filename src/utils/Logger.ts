@@ -3,10 +3,12 @@ import { join } from 'path';
 import { z } from 'zod';
 
 // 延迟导入WebSocket管理器，避免循环依赖
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 let websocketManager: any = null;
 const getWebSocketManager = () => {
   if (!websocketManager) {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       websocketManager = require('../api/WebSocketManager').websocketManager;
     } catch {
       // 如果无法导入，说明WebSocket模块不可用
@@ -53,6 +55,11 @@ export interface LogEntry {
 }
 
 /**
+ * 日志文件格式类型
+ */
+export type LogFileFormat = 'jsonl' | 'text';
+
+/**
  * Logger配置接口
  */
 export interface LoggerConfig {
@@ -64,6 +71,7 @@ export interface LoggerConfig {
   maxFiles?: number; // 最大文件数量（默认5）
   dateFormat?: string; // 时间格式（默认ISO）
   logDir?: string; // 日志目录（默认logs）
+  fileFormat?: LogFileFormat; // 文件日志格式（默认jsonl）
 }
 
 /**
@@ -81,6 +89,7 @@ const LoggerConfigSchema = z.object({
   maxFiles: z.number().positive().default(5),
   dateFormat: z.string().default('iso'),
   logDir: z.string().default('logs'),
+  fileFormat: z.enum(['jsonl', 'text']).default('jsonl'),
 });
 
 /**
@@ -254,7 +263,9 @@ export class Logger {
   private static getConfigFromApp(): Partial<LoggerConfig> {
     try {
       // 直接读取配置文件，避免循环依赖
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { existsSync, readFileSync } = require('fs');
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
       const { parse: parseToml } = require('smol-toml');
 
       const configPath = './config.toml';
@@ -264,6 +275,7 @@ export class Logger {
 
         if (rawConfig && rawConfig.logging) {
           const logging = rawConfig.logging;
+          const fileFormat = logging.file_format === 'text' ? 'text' : 'jsonl';
           return {
             level: Logger.parseLogLevel(logging.level || 'info'),
             console: logging.console !== false, // 默认true
@@ -272,6 +284,7 @@ export class Logger {
             maxFileSize: logging.max_file_size || 10 * 1024 * 1024,
             maxFiles: logging.max_files || 5,
             logDir: logging.log_dir || './logs',
+            fileFormat,
           };
         }
       }
@@ -289,6 +302,7 @@ export class Logger {
       maxFileSize: 10 * 1024 * 1024,
       maxFiles: 5,
       logDir: './logs',
+      fileFormat: 'jsonl' as const,
     };
   }
 
@@ -420,16 +434,25 @@ export class Logger {
    */
   private writeToFile(entry: LogEntry): void {
     try {
-      // 写入JSONL格式
-      const jsonLine = JSON.stringify(entry) + '\n';
-      const lineSize = Buffer.byteLength(jsonLine, 'utf8');
+      const isJsonl = this.config.fileFormat !== 'text';
+      let line: string;
+
+      if (isJsonl) {
+        // JSONL 格式：每行一个 JSON 对象
+        line = JSON.stringify(entry) + '\n';
+      } else {
+        // Text 格式：人类可读的纯文本
+        line = this.formatTextLog(entry) + '\n';
+      }
+
+      const lineSize = Buffer.byteLength(line, 'utf8');
 
       // 检查是否需要轮转日志（写入前检查）
       if (this.rotationInfo.currentSize + lineSize > this.config.maxFileSize!) {
         this.rotateLog();
       }
 
-      appendFileSync(this.currentFilePath, jsonLine, 'utf8');
+      appendFileSync(this.currentFilePath, line, 'utf8');
 
       // 更新当前文件大小
       this.rotationInfo.currentSize += lineSize;
@@ -438,6 +461,43 @@ export class Logger {
       console.error('Failed to write log to file:', error);
       console.error('Log entry:', entry);
     }
+  }
+
+  /**
+   * 格式化纯文本日志
+   */
+  private formatTextLog(entry: LogEntry): string {
+    const levelName = LOG_LEVEL_NAMES[entry.level];
+    const timestamp = this.formatTimestamp(new Date(entry.timestamp));
+
+    // 创建context副本，移除module字段（因为已经在模块前缀中显示了）
+    const contextForDisplay = entry.context ? { ...entry.context } : undefined;
+    if (contextForDisplay?.module) {
+      delete contextForDisplay.module;
+    }
+
+    const contextStr = contextForDisplay && Object.keys(contextForDisplay).length > 0 ? ` ${JSON.stringify(contextForDisplay, null, 0)}` : '';
+
+    // 构建日志前缀
+    const parts: string[] = [];
+    parts.push(`[${timestamp}]`);
+    parts.push(`[${levelName}]`);
+
+    // 模块前缀
+    if (entry.context?.module) {
+      parts.push(`[${entry.context.module}]`);
+    }
+
+    // 构建完整消息
+    const prefix = parts.join(' ');
+    let message = `${prefix} ${entry.message}${contextStr}`;
+
+    // 如果有错误堆栈，添加到消息末尾
+    if (entry.error?.stack) {
+      message += `\n${entry.error.stack}`;
+    }
+
+    return message;
   }
 
   /**
@@ -476,7 +536,8 @@ export class Logger {
    */
   private getLogFilePath(): string {
     const { fileIndex, currentDate } = this.rotationInfo;
-    const fileName = fileIndex > 0 ? `app-${currentDate}-${fileIndex}.jsonl` : `app-${currentDate}.jsonl`;
+    const ext = this.config.fileFormat === 'text' ? 'log' : 'jsonl';
+    const fileName = fileIndex > 0 ? `app-${currentDate}-${fileIndex}.${ext}` : `app-${currentDate}.${ext}`;
     return join(this.config.logDir!, fileName);
   }
 
@@ -516,10 +577,11 @@ export class Logger {
 
     try {
       const logDir = this.config.logDir!;
+      const ext = this.config.fileFormat === 'text' ? '.log' : '.jsonl';
 
       // 获取所有日志文件并按修改时间排序（最新的在前）
       const files = readdirSync(logDir)
-        .filter((file: string) => file.startsWith('app-') && file.endsWith('.jsonl'))
+        .filter((file: string) => file.startsWith('app-') && file.endsWith(ext))
         .map((file: string) => ({
           name: file,
           path: join(logDir, file),
