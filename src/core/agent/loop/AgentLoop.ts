@@ -12,6 +12,7 @@ import { ToolRegistry } from '@/core/agent/tool/ToolRegistry';
 import { InterruptManager, CancellationError } from '@/core/interrupt';
 import { ContextBuilder } from './ContextBuilder';
 import { LLMHistoryLogger } from './LLMHistoryLogger';
+import { HistoryCompressor } from './HistoryCompressor';
 import type { ToolCall } from '@/llm/types';
 
 interface HistoryMessage {
@@ -28,6 +29,7 @@ export class AgentLoop extends BaseLoop<AgentState> {
   private interruptManager: InterruptManager;
   private contextBuilder: ContextBuilder;
   private historyLogger: LLMHistoryLogger;
+  private historyCompressor: HistoryCompressor;
   private loopCount: number = 0;
   private conversationHistory: HistoryMessage[] = [];
   private maxHistoryTurns: number = 10;
@@ -39,6 +41,7 @@ export class AgentLoop extends BaseLoop<AgentState> {
     this.interruptManager = interruptManager;
     this.contextBuilder = new ContextBuilder(state);
     this.historyLogger = new LLMHistoryLogger('data');
+    this.historyCompressor = new HistoryCompressor();
     this.logger.info(`LLM 历史将保存到: ${this.historyLogger.getSessionFile()}`);
   }
 
@@ -108,7 +111,7 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
   /**
    * 构建消息列表
-   * 结构：[system, user(最新状态), ...history(assistant+tool对话链)]
+   * 结构：[system, user(最新状态), ...history(压缩后的对话链)]
    */
   private buildMessages(
     systemPrompt: string,
@@ -119,7 +122,9 @@ export class AgentLoop extends BaseLoop<AgentState> {
       { role: 'user', content: userPrompt },
     ];
 
-    messages.push(...this.conversationHistory);
+    // 使用压缩后的历史
+    const compressedHistory = this.historyCompressor.compress(this.conversationHistory);
+    messages.push(...compressedHistory);
 
     return messages;
   }
