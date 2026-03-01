@@ -246,34 +246,21 @@ class MaicraftTestBot {
     const placeBlockUtils = new PlaceBlockUtils(logger, movementUtils);
 
     const blockCache = new BlockCache({
-      maxEntries: 0,
       expirationTime: 0,
       autoSaveInterval: 0,
       enabled: true,
-      updateStrategy: 'smart' as const,
       onlyVisibleBlocks: true,
     });
 
     const containerCache = new ContainerCache({
-      maxEntries: 0,
       expirationTime: 0,
       autoSaveInterval: 0,
       enabled: true,
-      updateStrategy: 'smart' as const,
     });
 
     const locationManager = new LocationManager();
 
-    const { CacheManager } = await import('./core/cache/CacheManager');
-    const cacheManager = new CacheManager(this.bot, blockCache, containerCache, {
-      blockScanInterval: 5000,
-      blockScanRadius: 50,
-      containerUpdateInterval: 10000,
-      autoSaveInterval: 60000,
-      enablePeriodicScan: false,
-      enableAutoSave: false,
-      performanceMode: 'balanced' as const,
-    });
+    blockCache.attachBot(this.bot);
 
     const { NearbyBlockManager } = await import('./core/cache/NearbyBlockManager');
     const nearbyBlockManager = new NearbyBlockManager(blockCache, this.bot);
@@ -289,7 +276,6 @@ class MaicraftTestBot {
       blockCache,
       containerCache,
       locationManager,
-      cacheManager,
       nearbyBlockManager,
       signal: new AbortController().signal,
       placeBlockUtils,

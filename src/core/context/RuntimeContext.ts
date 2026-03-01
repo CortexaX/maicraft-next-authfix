@@ -9,7 +9,6 @@ import { MovementUtils } from '@/utils/MovementUtils';
 import { CraftManager } from '@/core/crafting/CraftManager';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
-import { CacheManager } from '@/core/cache/CacheManager';
 import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import type { LLMManager } from '@/llm/LLMManager';
 import type { GoalManager } from '@/core/agent/planning/goal/GoalManager';
@@ -26,21 +25,14 @@ export interface Config {
 }
 
 export interface LocationManager {
-  setLocation(name: string, position: Vec3, info: string, metadata?: any): Location;
+  setLocation(name: string, position: Vec3 | { x: number; y: number; z: number }, info: string): Location;
   getLocation(name: string): Location | undefined;
   deleteLocation(name: string): boolean;
   updateLocation(name: string, info: string): boolean;
   getAllLocations(): Location[];
   findNearby(center: Vec3, radius?: number): Location[];
-  search(query: string): Location[];
-  getNearest(center: Vec3): Location | undefined;
   getAllLocationsString(): string;
-  getNearbyLocationsString(center: Vec3, radius?: number): string;
   hasLocation(name: string): boolean;
-  clear(): void;
-  size(): number;
-  export(): any[];
-  import(data: any[]): void;
   save(): Promise<void>;
 }
 
@@ -53,7 +45,6 @@ export interface RuntimeContext {
   blockCache: BlockCache;
   containerCache: ContainerCache;
   locationManager: LocationManager;
-  cacheManager: CacheManager;
   nearbyBlockManager: NearbyBlockManager;
 
   events: EventBus;

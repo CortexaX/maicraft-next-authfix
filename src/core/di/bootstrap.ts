@@ -6,7 +6,6 @@ import { getConfigManager } from '@/utils/Config';
 import { BlockCache } from '@/core/cache/BlockCache';
 import { ContainerCache } from '@/core/cache/ContainerCache';
 import { LocationManager } from '@/core/cache/LocationManager';
-import { CacheManager } from '@/core/cache/CacheManager';
 import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import { GameState } from '@/core/state/GameState';
 import { ContextManager } from '@/core/context/ContextManager';
@@ -63,7 +62,6 @@ export interface AppServices {
   blockCache: BlockCache;
   containerCache: ContainerCache;
   locationManager: LocationManager;
-  cacheManager: CacheManager;
   nearbyBlockManager: NearbyBlockManager;
   gameState: GameState;
   goalManager: GoalManager;
@@ -88,33 +86,21 @@ export interface AppServices {
 
 export function createServices(bot: Bot, config: AppConfig, logger: Logger): AppServices {
   const blockCache = new BlockCache({
-    maxEntries: config.cache.max_block_entries,
-    expirationTime: config.cache.block_expiration_time,
-    autoSaveInterval: config.cache.enable_auto_save ? 60000 : 0,
+    expirationTime: 0,
+    autoSaveInterval: 0,
     enabled: true,
-    updateStrategy: 'smart' as const,
     onlyVisibleBlocks: config.cache.only_visible_blocks,
   });
 
   const containerCache = new ContainerCache({
-    maxEntries: config.cache.max_container_entries,
     expirationTime: config.cache.container_expiration_time,
     autoSaveInterval: config.cache.enable_auto_save ? 60000 : 0,
     enabled: true,
-    updateStrategy: 'smart' as const,
   });
 
   const locationManager = new LocationManager();
 
-  const cacheManager = new CacheManager(bot, blockCache, containerCache, {
-    blockScanInterval: 5000,
-    blockScanRadius: 50,
-    containerUpdateInterval: 10000,
-    autoSaveInterval: 60000,
-    enablePeriodicScan: config.cache.enable_periodic_scan,
-    enableAutoSave: config.cache.enable_auto_save,
-    performanceMode: 'balanced' as const,
-  });
+  blockCache.attachBot(bot);
 
   const nearbyBlockManager = new NearbyBlockManager(blockCache, bot);
 
@@ -124,7 +110,7 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
 
   const movementUtils = new MovementUtils(logger);
   const placeBlockUtils = new PlaceBlockUtils(logger, movementUtils);
-  const craftManager = new CraftManager(bot, cacheManager);
+  const craftManager = new CraftManager(bot);
 
   const contextManager = new ContextManager({
     bot,
@@ -134,7 +120,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     blockCache,
     containerCache,
     locationManager,
-    cacheManager,
     nearbyBlockManager,
     signal: new AbortController().signal,
     placeBlockUtils,
@@ -173,7 +158,6 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
     blockCache,
     containerCache,
     locationManager,
-    cacheManager,
     nearbyBlockManager,
     gameState,
     goalManager,
@@ -251,7 +235,6 @@ export async function initializeServices(services: AppServices, bot: Bot, logger
 
 async function startCacheSystem(services: AppServices, logger: Logger): Promise<void> {
   logger.info('启动缓存系统', {
-    hasCacheManager: !!services.cacheManager,
     hasNearbyBlockManager: !!services.nearbyBlockManager,
   });
 
@@ -264,10 +247,7 @@ async function startCacheSystem(services: AppServices, logger: Logger): Promise<
       containerCacheSize: services.containerCache.size(),
     });
 
-    services.cacheManager.start();
-    logger.info('缓存管理器已启动');
-
-    await services.cacheManager.triggerBlockScan();
+    await services.blockCache.performInitialScan(services.contextManager.getContext().bot);
     logger.info('初始方块扫描完成');
   } catch (error) {
     logger.error('启动缓存系统失败', undefined, error as Error);
@@ -293,7 +273,6 @@ export async function disposeServices(services: AppServices): Promise<void> {
 
   services.contextManager.cleanup();
 
-  services.cacheManager.destroy();
   services.blockCache.destroy();
   services.containerCache.destroy();
 }

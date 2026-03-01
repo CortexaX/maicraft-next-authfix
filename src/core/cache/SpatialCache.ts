@@ -21,18 +21,10 @@ export interface SpatialCacheConfig {
 }
 
 /**
- * 缓存项基础接口
- */
-export interface CacheEntry {
-  /** 缓存时间戳 */
-  timestamp: number;
-}
-
-/**
  * 空间缓存抽象基类
  * @template T 缓存项类型
  */
-export abstract class SpatialCache<T extends CacheEntry> {
+export abstract class SpatialCache<T> {
   protected cache: Map<string, T> = new Map();
   protected chunkIndex: Map<string, Set<string>> = new Map();
   protected logger: Logger;
@@ -100,11 +92,11 @@ export abstract class SpatialCache<T extends CacheEntry> {
   /**
    * 检查缓存项是否过期
    */
-  protected isExpired(entry: T): boolean {
+  protected isExpired(_entry: T): boolean {
     if (this.config.expirationTime === 0) {
       return false;
     }
-    return Date.now() - entry.timestamp > this.config.expirationTime;
+    return false;
   }
 
   /**
