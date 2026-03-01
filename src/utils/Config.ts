@@ -137,13 +137,9 @@ export interface MaibotSection {
  * 缓存配置接口
  */
 export interface CacheSection {
-  // 方块缓存配置
   only_visible_blocks: boolean;
-  enable_periodic_scan: boolean;
   enable_auto_save: boolean;
-  max_block_entries: number;
   max_container_entries: number;
-  block_expiration_time: number;
   container_expiration_time: number;
 }
 
@@ -297,11 +293,8 @@ const MaibotSectionSchema = z.object({
 
 const CacheSectionSchema = z.object({
   only_visible_blocks: z.boolean().default(true),
-  enable_periodic_scan: z.boolean().default(false),
   enable_auto_save: z.boolean().default(false),
-  max_block_entries: z.number().min(0).default(0),
   max_container_entries: z.number().min(0).default(0),
-  block_expiration_time: z.number().min(0).default(0),
   container_expiration_time: z.number().min(0).default(0),
 });
 

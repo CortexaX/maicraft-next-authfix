@@ -283,7 +283,7 @@ export class PromptDataCollector {
 
   private getNearbyBlocksInfo(): string {
     try {
-      const { gameState, bot, nearbyBlockManager, blockCache } = this.state.context;
+      const { gameState, bot, nearbyBlockManager } = this.state.context;
 
       let currentPosition;
       if (bot?.entity?.position) {
@@ -310,56 +310,7 @@ export class PromptDataCollector {
         return blockInfo;
       }
 
-      const nearbyBlocks = blockCache.getBlocksInRadius(currentPosition.x, currentPosition.y, currentPosition.z, 16);
-      this.logger.debug(`🔍 获取周围方块: 找到 ${nearbyBlocks.length} 个方块`);
-
-      if (nearbyBlocks.length === 0) {
-        return '附近没有方块信息';
-      }
-
-      const validBlocks = nearbyBlocks.filter(block => block.name !== 'air');
-
-      if (validBlocks.length === 0) {
-        return '附近都是空气方块';
-      }
-
-      validBlocks.sort((a, b) => {
-        const distA = Math.sqrt(
-          Math.pow(a.position.x - currentPosition.x, 2) +
-            Math.pow(a.position.y - currentPosition.y, 2) +
-            Math.pow(a.position.z - currentPosition.z, 2),
-        );
-        const distB = Math.sqrt(
-          Math.pow(b.position.x - currentPosition.x, 2) +
-            Math.pow(b.position.y - currentPosition.y, 2) +
-            Math.pow(b.position.z - currentPosition.z, 2),
-        );
-        return distA - distB;
-      });
-
-      const groupedBlocks = new Map<string, Array<{ position: any; distance: number }>>();
-      for (const block of validBlocks) {
-        const pos = block.position;
-        const distance = Math.sqrt(
-          Math.pow(pos.x - currentPosition.x, 2) + Math.pow(pos.y - currentPosition.y, 2) + Math.pow(pos.z - currentPosition.z, 2),
-        );
-
-        if (!groupedBlocks.has(block.name)) {
-          groupedBlocks.set(block.name, []);
-        }
-        groupedBlocks.get(block.name)!.push({ position: pos, distance });
-      }
-
-      const blockLines: string[] = [];
-      for (const [blockName, positions] of groupedBlocks) {
-        const count = positions.length;
-        const nearest = positions[0];
-        blockLines.push(
-          `  ${blockName} (${count}个) 最近: (${nearest.position.x}, ${nearest.position.y}, ${nearest.position.z}) [${nearest.distance.toFixed(1)}格]`,
-        );
-      }
-
-      return `附近方块 (${validBlocks.length}个):\n${blockLines.join('\n')}`;
+      return '附近方块信息不可用';
     } catch (error) {
       this.logger.error('获取附近方块信息失败', undefined, error as Error);
       return '获取附近方块信息失败';

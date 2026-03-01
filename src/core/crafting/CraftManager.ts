@@ -50,16 +50,11 @@ export class CraftManager {
   private logger: Logger;
   private cacheManager: any = null;
 
-  constructor(bot: Bot, cacheManager?: any) {
+  constructor(bot: Bot) {
     this.bot = bot;
     this.logger = getLogger('CraftManager');
-    this.cacheManager = cacheManager || null;
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     this.mcData = require('minecraft-data')(bot.version);
-  }
-
-  setCacheManager(cacheManager: any): void {
-    this.cacheManager = cacheManager;
   }
 
   /**
@@ -678,22 +673,8 @@ export class CraftManager {
         await new Promise(resolve => setTimeout(resolve, 500));
       }
 
-      let scanningPaused = false;
-      if (this.cacheManager && typeof this.cacheManager.pauseScanning === 'function') {
-        this.cacheManager.pauseScanning();
-        scanningPaused = true;
-        logger.debug('⏸️ 已暂停方块扫描（合成期间）');
-      }
-
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        await this.bot.craft(recipe as any, count, craftingTable);
-      } finally {
-        if (scanningPaused && this.cacheManager && typeof this.cacheManager.resumeScanning === 'function') {
-          this.cacheManager.resumeScanning();
-          logger.debug('▶️ 已恢复方块扫描');
-        }
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await this.bot.craft(recipe as any, count, craftingTable);
 
       logger.info(`合成成功: ${originalItemName} x${count}`);
 
