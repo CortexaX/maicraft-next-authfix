@@ -13,6 +13,7 @@ import { InterruptManager, CancellationError } from '@/core/interrupt';
 import { ContextBuilder } from './ContextBuilder';
 import { LLMHistoryLogger } from './LLMHistoryLogger';
 import { HistoryCompressor } from './HistoryCompressor';
+import { SemanticCompressor, type HistoryEntry } from './SemanticCompressor';
 import type { ToolCall } from '@/llm/types';
 
 interface HistoryMessage {
@@ -30,9 +31,11 @@ export class AgentLoop extends BaseLoop<AgentState> {
   private contextBuilder: ContextBuilder;
   private historyLogger: LLMHistoryLogger;
   private historyCompressor: HistoryCompressor;
+  private semanticCompressor: SemanticCompressor;
   private loopCount: number = 0;
   private conversationHistory: HistoryMessage[] = [];
   private maxHistoryTurns: number = 10;
+  private useSemanticCompression: boolean = true;
 
   constructor(state: AgentState, llmManager: LLMManager, toolRegistry: ToolRegistry, interruptManager: InterruptManager) {
     super(state, 'AgentLoop');
@@ -42,7 +45,42 @@ export class AgentLoop extends BaseLoop<AgentState> {
     this.contextBuilder = new ContextBuilder(state);
     this.historyLogger = new LLMHistoryLogger('data');
     this.historyCompressor = new HistoryCompressor();
+
+    // 创建语义压缩器，使用 LLM 的 simpleChat 方法
+    const llmCaller = async (prompt: string, systemPrompt?: string) => {
+      return this.llmManager.simpleChat(prompt, systemPrompt);
+    };
+
+    // 上下文提供器：获取当前游戏状态
+    const contextProvider = () => {
+      const gameState = this.state.context.gameState;
+      const goalManager = this.state.context.goalManager;
+      const currentGoal = goalManager?.getCurrentGoal();
+
+      return {
+        goal: currentGoal?.content ?? '无目标',
+        plan: currentGoal?.plan ?? '无计划',
+        inventory: `物品栏: ${
+          gameState.inventory
+            ?.slice(0, 5)
+            .map((i: any) => `${i.name}x${i.count}`)
+            .join(', ') ?? '空'
+        }...`,
+        position: `(${gameState.blockPosition?.x ?? '?'}, ${gameState.blockPosition?.y ?? '?'}, ${gameState.blockPosition?.z ?? '?'})`,
+      };
+    };
+
+    this.semanticCompressor = new SemanticCompressor(
+      llmCaller,
+      {
+        compressThreshold: 8, // 8 条消息（4 轮）后触发压缩
+        keepRecentTurns: 2, // 保留最近 2 轮（4 条消息）
+      },
+      contextProvider,
+    );
+
     this.logger.info(`LLM 历史将保存到: ${this.historyLogger.getSessionFile()}`);
+    this.logger.info('语义压缩器已启用', { useSemanticCompression: this.useSemanticCompression });
   }
 
   protected async runLoopIteration(): Promise<void> {
@@ -82,16 +120,33 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
       this.logger.info(`✅ LLM 返回 ${toolCalls.length} 个工具调用`);
 
-      this.conversationHistory.push({
+      const assistantEntry: HistoryMessage = {
         role: 'assistant',
         content: '[调用工具]',
         tool_calls: toolCalls,
-      });
+      };
+      this.conversationHistory.push(assistantEntry);
+
+      // 同时添加到语义压缩器
+      if (this.useSemanticCompression) {
+        this.semanticCompressor.addEntry(assistantEntry as HistoryEntry);
+      }
 
       for (const toolCall of toolCalls) {
         signal.throwIfAborted();
         const result = await this.executeToolCallWithResult(toolCall);
         toolResults.push(result);
+
+        // 同时添加到语义压缩器
+        if (this.useSemanticCompression && result.result) {
+          const toolEntry: HistoryEntry = {
+            role: 'tool',
+            tool_call_id: result.toolCallId,
+            name: result.name,
+            content: JSON.stringify(result.result),
+          };
+          this.semanticCompressor.addEntry(toolEntry);
+        }
       }
 
       await this.historyLogger.logLLMCall(this.loopCount, messages, toolCalls, toolResults);
@@ -111,7 +166,10 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
   /**
    * 构建消息列表
-   * 结构：[system, user(最新状态), ...history(压缩后的对话链)]
+   *
+   * 两种模式：
+   * - 语义压缩模式：[system, user(含历史摘要), 最近1-2轮历史]
+   * - 程序压缩模式：[system, user, ...压缩后的对话链]
    */
   private buildMessages(
     systemPrompt: string,
@@ -119,12 +177,36 @@ export class AgentLoop extends BaseLoop<AgentState> {
   ): Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }> {
     const messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }> = [
       { role: 'system', content: systemPrompt },
-      { role: 'user', content: userPrompt },
     ];
 
-    // 使用压缩后的历史
-    const compressedHistory = this.historyCompressor.compress(this.conversationHistory);
-    messages.push(...compressedHistory);
+    if (this.useSemanticCompression) {
+      // 语义压缩模式：将历史摘要合并到 user 消息中
+      const summary = this.semanticCompressor.getSummary();
+      const enhancedUserPrompt = summary ? `${userPrompt}\n\n## 历史行动摘要\n${summary}` : userPrompt;
+      messages.push({ role: 'user', content: enhancedUserPrompt });
+
+      // 只添加语义压缩器保留的最近历史
+      const retainedHistory = this.semanticCompressor.getRetainedHistory();
+      for (const entry of retainedHistory) {
+        messages.push({
+          role: entry.role,
+          content: entry.content,
+          tool_calls: entry.tool_calls,
+          tool_call_id: entry.tool_call_id,
+          name: entry.name,
+        });
+      }
+
+      this.logger.debug('语义压缩模式', {
+        summaryLength: summary.length,
+        retainedHistoryCount: retainedHistory.length,
+      });
+    } else {
+      // 程序压缩模式：使用 HistoryCompressor
+      messages.push({ role: 'user', content: userPrompt });
+      const compressedHistory = this.historyCompressor.compress(this.conversationHistory);
+      messages.push(...compressedHistory);
+    }
 
     return messages;
   }
@@ -203,6 +285,7 @@ export class AgentLoop extends BaseLoop<AgentState> {
 
   resetHistory(): void {
     this.conversationHistory = [];
+    this.semanticCompressor.reset();
   }
 
   private async checkGoalAndTaskCompletion(): Promise<void> {

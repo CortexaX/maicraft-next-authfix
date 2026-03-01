@@ -24,6 +24,7 @@ export interface BuiltContext {
 export class ContextBuilder {
   private dataCollector: PromptDataCollector;
   private state: AgentState;
+  private historySummary: string = '';
 
   constructor(state: AgentState) {
     this.state = state;
@@ -31,6 +32,20 @@ export class ContextBuilder {
     // 复用 PromptDataCollector
     const actionPromptGenerator = new ActionPromptGenerator(state.context.executor!);
     this.dataCollector = new PromptDataCollector(state, actionPromptGenerator);
+  }
+
+  /**
+   * 设置历史摘要（由 SemanticCompressor 提供）
+   */
+  setHistorySummary(summary: string): void {
+    this.historySummary = summary;
+  }
+
+  /**
+   * 获取当前历史摘要
+   */
+  getHistorySummary(): string {
+    return this.historySummary;
   }
 
   /**
@@ -136,6 +151,12 @@ export class ContextBuilder {
     // 当前目标和任务
     parts.push('\n## 当前目标与任务\n');
     parts.push(this.getGoalAndTaskSummary());
+
+    // 历史行动摘要（由 SemanticCompressor 提供）
+    if (this.historySummary) {
+      parts.push('\n## 历史行动摘要\n');
+      parts.push(this.historySummary);
+    }
 
     return parts.join('\n');
   }
