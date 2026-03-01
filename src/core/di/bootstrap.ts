@@ -144,6 +144,8 @@ export function createServices(bot: Bot, config: AppConfig, logger: Logger): App
   const memoryManager = new MemoryManager(config, logger, eventBus);
   const memoryService = new MemoryServiceImpl(memoryManager, eventBus);
 
+  contextManager.setMemory(memoryService);
+
   const interruptManager = new InterruptManager(gameState, actionExecutor.getEventBus());
   const trackerFactory = new TrackerFactory(actionExecutor.getEventBus());
   const configLoader = new ConfigLoader();

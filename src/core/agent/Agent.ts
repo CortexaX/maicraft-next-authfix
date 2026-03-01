@@ -80,7 +80,7 @@ export class Agent {
     this.state = {
       goal: config.agent?.goal || '探索世界',
       isRunning: false,
-      context,
+      context: { ...context, memory },
       memory,
       llmManager: this.llmManager,
       interruptManager: this.interruptManager,

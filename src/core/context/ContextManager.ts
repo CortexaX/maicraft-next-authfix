@@ -11,6 +11,7 @@ import type { PlaceBlockUtils } from '@/utils/PlaceBlockUtils';
 import type { MovementUtils } from '@/utils/MovementUtils';
 import type { CraftManager } from '@/core/crafting/CraftManager';
 import type { LLMManager } from '@/llm/LLMManager';
+import type { MemoryService } from '@/core/agent/memory/MemoryService';
 
 export interface ContextManagerParams {
   bot: Bot;
@@ -27,6 +28,7 @@ export interface ContextManagerParams {
   craftManager: CraftManager;
   goalManager?: any;
   llmManager?: LLMManager;
+  memory?: MemoryService;
 }
 
 export class ContextManager {
@@ -53,7 +55,8 @@ export class ContextManager {
       craftManager: params.craftManager,
       goalManager: params.goalManager,
       llmManager: params.llmManager,
-    };
+      memory: params.memory,
+    } as RuntimeContext;
   }
 
   getContext(): RuntimeContext {
@@ -69,6 +72,10 @@ export class ContextManager {
 
   updateExecutor(executor: ActionExecutor): void {
     this.context.executor = executor;
+  }
+
+  setMemory(memory: MemoryService): void {
+    (this.context as any).memory = memory;
   }
 
   cleanup(): void {

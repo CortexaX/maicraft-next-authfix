@@ -27,6 +27,9 @@ export interface PlanActionParams extends BaseActionParams {
   /** 执行计划（自然语言描述） */
   plan?: string;
 
+  /** 思考：对当前状态的分析和决策理由（可选，50字以内） */
+  reasoning?: string;
+
   /** Tracker配置（可选） */
   tracker?: TrackerConfig;
 
@@ -40,7 +43,7 @@ export interface PlanActionParams extends BaseActionParams {
 export class PlanAction extends BaseAction<PlanActionParams> {
   readonly id = ActionIds.PLAN_ACTION;
   readonly name = '规划管理';
-  readonly description = '管理目标的规划。可以添加、编辑、删除、完成目标，或更新目标的执行计划。';
+  readonly description = '管理目标规划（可选添加 reasoning 字段记录思考过程）。可以添加、编辑、删除、完成目标，或更新执行计划。';
 
   private getTrackerFactory(context: RuntimeContext): TrackerFactory {
     return new TrackerFactory(context.events);
@@ -48,6 +51,11 @@ export class PlanAction extends BaseAction<PlanActionParams> {
 
   protected async doExecute(context: RuntimeContext, params: PlanActionParams): Promise<ActionResult> {
     try {
+      if (params.reasoning && context.memory) {
+        const truncatedReasoning = params.reasoning.length > 100 ? params.reasoning.substring(0, 97) + '...' : params.reasoning;
+        context.memory.recordThought(truncatedReasoning, { operation: params.operation });
+      }
+
       return await this.handleGoal(context, params);
     } catch (error) {
       logger.error('[PlanAction] 执行出错:', { error });
@@ -157,6 +165,11 @@ export class PlanAction extends BaseAction<PlanActionParams> {
         plan: {
           type: 'string',
           description: '执行计划，用自然语言描述的执行步骤（add、edit、update_plan操作可用）',
+        },
+        reasoning: {
+          type: 'string',
+          description: '思考：对当前状态的分析和决策理由（可选，50字以内，会被记录到思考历史）',
+          maxLength: 100,
         },
         tracker: {
           type: 'object',

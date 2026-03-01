@@ -51,10 +51,8 @@ export class ContextBuilder {
     const gameState = this.state.context.gameState;
     const parts: string[] = [];
 
-    // 基础 system prompt
     parts.push(this.getBaseSystemPrompt());
 
-    // 动态追加部分
     if (this.isLowHealth(gameState)) {
       parts.push('\n⚠️ 警告：你的生命值很低，请优先考虑安全！');
     }
@@ -71,7 +69,22 @@ export class ContextBuilder {
       parts.push('\n⚠️ 警告：你一直在更新计划，但从未执行实际动作！请**立即停止制定计划**，直接调用 find_block、move、mine_block 等工具执行任务！');
     }
 
+    if (this.onlyThinkingNoAction()) {
+      parts.push(
+        '\n🚨 严重警告：你连续多轮只更新计划，没有执行任何实际动作！\n**本轮禁止调用 plan_action**，必须直接调用 find_block、move、mine_at_position 等实际工具！',
+      );
+    }
+
     return parts.join('\n');
+  }
+
+  private onlyThinkingNoAction(): boolean {
+    const recentDecisions = this.state.memory.decision.getRecent(3);
+    if (recentDecisions.length < 2) return false;
+
+    const planningCount = recentDecisions.filter(d => d.intention.includes('plan_action')).length;
+
+    return planningCount >= 2;
   }
 
   private hasGoalButOnlyPlanning(): boolean {
@@ -137,17 +150,27 @@ export class ContextBuilder {
 
 ## 核心规则
 
-1. **先思考后行动**：每次回复先用简短的一句话说明你的分析和决策，然后调用工具。
-2. **持续行动**：每轮必须调用至少一个工具推进任务。
-3. **安全第一**：生命值低时优先躲避或治疗。
-4. **探索策略**：找不到资源时立即移动探索，不要重复相同的查找。
+1. **必须行动**：每轮**必须调用至少一个实际工具**推进任务。
+2. **可选思考**：plan_action 工具的 reasoning 字段可以记录你的分析（可选）。
+3. **优先行动**：如果已有目标，直接调用 find_block、move、mine_at_position 等工具执行，不要反复更新计划。
+4. **安全第一**：生命值低时优先躲避或治疗。
 
-## 回复格式示例
+## 实际工具列表
 
-思考：附近16格内没有橡木，需要向远处探索。
-[调用 move 工具]
+- find_block: 寻找方块
+- move: 移动到指定位置  
+- mine_at_position: 挖掘指定位置
+- mine_by_type: 按类型挖掘
+- craft: 合成物品
+- eat: 进食
 
-记住：思考 + 行动！`;
+## 示例
+
+正确：[调用 find_block] block="oak_log" radius=32
+正确：[调用 plan_action] operation="add" content="收集木材" reasoning="需要橡木制作工具"
+错误：[只调用 plan_action 更新计划] ← 禁止反复更新计划！
+
+记住：实际工具优先，思考是可选的！`;
   }
 
   // 辅助方法

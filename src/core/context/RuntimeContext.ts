@@ -12,6 +12,7 @@ import { ContainerCache } from '@/core/cache/ContainerCache';
 import { NearbyBlockManager } from '@/core/cache/NearbyBlockManager';
 import type { LLMManager } from '@/llm/LLMManager';
 import type { GoalManager } from '@/core/agent/planning/goal/GoalManager';
+import type { MemoryService } from '@/core/agent/memory/MemoryService';
 
 export interface Logger {
   debug(message: string, ...args: any[]): void;
@@ -62,6 +63,8 @@ export interface RuntimeContext {
   goalManager: GoalManager;
 
   llmManager?: LLMManager;
+
+  memory?: MemoryService;
 }
 
 export function createPrefixedLogger(baseLogger: Logger, prefix: string): Logger {
