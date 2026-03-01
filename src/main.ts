@@ -305,16 +305,16 @@ async function main(): Promise<void> {
 
   if (cleanData) {
     const dataDir = path.join(process.cwd(), 'data');
+    const logDir = path.join(process.cwd(), 'logs');
     try {
       if (fs.existsSync(dataDir)) {
-        console.log('🗑️ 正在清空data目录...');
         fs.rmSync(dataDir, { recursive: true, force: true });
-        console.log('✅ 已清空data目录');
-      } else {
-        console.log('ℹ️ data目录不存在，跳过清空操作');
+      }
+      if (fs.existsSync(logDir)) {
+        fs.rmSync(logDir, { recursive: true, force: true });
       }
     } catch (error) {
-      console.error('❌ 清空data目录时出错:', error);
+      console.error('❌ 清空目录时出错:', error);
       process.exit(1);
     }
   }
