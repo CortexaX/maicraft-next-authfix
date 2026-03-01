@@ -129,9 +129,23 @@ export class LLMManager {
       // 处理工具调用
       if (response.choices[0]?.message?.tool_calls) {
         result.tool_calls = response.choices[0].message.tool_calls;
+        this.logger.info('✅ LLM 返回工具调用', {
+          tool_count: result.tool_calls.length,
+          tools: result.tool_calls.map((tc: any) => tc.function.name),
+        });
+      } else {
+        this.logger.warn('⚠️ LLM 没有返回 tool_calls', {
+          has_message: !!response.choices[0]?.message,
+          has_content: !!response.choices[0]?.message?.content,
+          content_length: response.choices[0]?.message?.content?.length || 0,
+          finish_reason: response.choices[0]?.finish_reason,
+        });
+        this.logger.debug('LLM 响应内容', {
+          content: response.choices[0]?.message?.content,
+        });
       }
 
-      this.logger.debug('聊天请求成功', {
+      this.logger.info('聊天请求成功', {
         provider: response.provider,
         response_id: response.id,
         usage: response.usage,
@@ -169,6 +183,96 @@ export class LLMManager {
     }
 
     return response.tool_calls || [];
+  }
+
+  /**
+   * 带历史记录的工具调用 - 支持 Function Calling 的多轮对话
+   * 关键：将工具执行结果反馈给 LLM，形成完整的对话链
+   */
+  async callToolWithHistory(
+    messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
+    tools: any[],
+    options?: Partial<LLMRequestConfig>,
+  ): Promise<ToolCall[] | null> {
+    if (!this.isActive) {
+      this.logger.error('LLM客户端未激活');
+      return null;
+    }
+
+    try {
+      const convertedMessages = this.convertMessagesForProvider(messages);
+
+      const requestConfig: LLMRequestConfig = {
+        model: this.getActiveProviderConfig().model,
+        messages: convertedMessages,
+        max_tokens: this.getActiveProviderConfig().max_tokens,
+        temperature: this.getActiveProviderConfig().temperature,
+        tools,
+        tool_choice: 'auto',
+        ...options,
+      };
+
+      this.logger.debug('发送带历史的LLM请求', {
+        message_count: messages.length,
+        tool_count: tools.length,
+      });
+
+      const response = await this.activeProvider!.chat(requestConfig);
+
+      this.usageTracker.recordUsage(this.activeProvider!.provider, response.model, response.usage);
+
+      if (response.choices[0]?.message?.tool_calls) {
+        this.logger.info('✅ LLM 返回工具调用（带历史）', {
+          tool_count: response.choices[0].message.tool_calls.length,
+          tools: response.choices[0].message.tool_calls.map((tc: any) => tc.function.name),
+        });
+        return response.choices[0].message.tool_calls;
+      }
+
+      this.logger.warn('⚠️ LLM 没有返回工具调用（带历史）');
+      return null;
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      this.logger.error('带历史的工具调用失败', { error: errorMessage });
+      return null;
+    }
+  }
+
+  /**
+   * 转换消息格式以兼容不同提供商
+   * 通义千问等提供商不支持 role: 'tool'，需要转换为 assistant
+   */
+  private convertMessagesForProvider(
+    messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }>,
+  ): ChatMessage[] {
+    const result: ChatMessage[] = [];
+
+    for (const msg of messages) {
+      if (msg.role === 'tool') {
+        result.push({
+          role: MessageRole.ASSISTANT,
+          content: `[工具结果 ${msg.name}]: ${msg.content}`,
+        });
+      } else if (msg.role === 'system') {
+        result.push({
+          role: MessageRole.SYSTEM,
+          content: msg.content,
+        });
+      } else if (msg.role === 'user') {
+        result.push({
+          role: MessageRole.USER,
+          content: msg.content,
+        });
+      } else if (msg.role === 'assistant') {
+        result.push({
+          role: MessageRole.ASSISTANT,
+          content: msg.content,
+          tool_calls: msg.tool_calls,
+        } as any);
+      }
+    }
+
+    return result;
   }
 
   /**

@@ -1,8 +1,8 @@
 /**
  * AgentLoop - ReAct 核心循环
  *
- * 取代 MainDecisionLoop，直接使用 LLM function-calling
- * 实现 ReAct 模式：观察 → 思考 → 工具调用 → 观察结果
+ * 使用 Function Calling 实现 ReAct 模式
+ * 动态状态通过每轮新的 user prompt 注入，历史只保留对话链
  */
 
 import { BaseLoop } from './BaseLoop';
@@ -11,18 +11,26 @@ import { LLMManager } from '@/llm/LLMManager';
 import { ToolRegistry } from '@/core/agent/tool/ToolRegistry';
 import { InterruptManager, CancellationError } from '@/core/interrupt';
 import { ContextBuilder } from './ContextBuilder';
+import { LLMHistoryLogger } from './LLMHistoryLogger';
 import type { ToolCall } from '@/llm/types';
 
-/**
- * AgentLoop - ReAct 核心循环
- * 取代 MainDecisionLoop，直接使用 LLM function-calling
- */
+interface HistoryMessage {
+  role: 'assistant' | 'tool';
+  content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+  name?: string;
+}
+
 export class AgentLoop extends BaseLoop<AgentState> {
   private llmManager: LLMManager;
   private toolRegistry: ToolRegistry;
   private interruptManager: InterruptManager;
   private contextBuilder: ContextBuilder;
+  private historyLogger: LLMHistoryLogger;
   private loopCount: number = 0;
+  private conversationHistory: HistoryMessage[] = [];
+  private maxHistoryTurns: number = 10;
 
   constructor(state: AgentState, llmManager: LLMManager, toolRegistry: ToolRegistry, interruptManager: InterruptManager) {
     super(state, 'AgentLoop');
@@ -30,16 +38,13 @@ export class AgentLoop extends BaseLoop<AgentState> {
     this.toolRegistry = toolRegistry;
     this.interruptManager = interruptManager;
     this.contextBuilder = new ContextBuilder(state);
+    this.historyLogger = new LLMHistoryLogger('data');
+    this.logger.info(`LLM 历史将保存到: ${this.historyLogger.getSessionFile()}`);
   }
 
-  /**
-   * 执行一次循环迭代
-   * ReAct 模式：检查中断 → 收集观察 → 构建 prompt → LLM 调用 → 执行工具 → 记录记忆
-   */
   protected async runLoopIteration(): Promise<void> {
     this.loopCount++;
 
-    // 1. 检测自动中断（战斗等）
     const handler = this.interruptManager.detect();
     if (handler) {
       this.logger.info(`检测到中断: ${handler.name}`);
@@ -47,41 +52,49 @@ export class AgentLoop extends BaseLoop<AgentState> {
       return;
     }
 
-    // 2. 创建本次迭代的取消信号
     const signal = this.interruptManager.beginScope();
-
-    // 3. 更新 RuntimeContext 中的 signal（让后续动作能感知）
     this.state.context.signal = signal;
 
-    // 4. 自动检测目标和任务完成
     await this.checkGoalAndTaskCompletion();
 
-    try {
-      // 5. 构建 prompt
-      const context = this.contextBuilder.buildContext();
+    let messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }> = [];
+    const toolResults: Array<{ toolCallId: string; name: string; success: boolean; result: any }> = [];
 
-      // 6. 获取可用工具 schema
+    try {
+      const context = this.contextBuilder.buildContext();
       const toolSchemas = this.toolRegistry.getAvailableToolSchemas();
 
-      this.logger.debug(`调用 LLM，可用工具: ${toolSchemas.length} 个`);
+      this.logger.info(`🔧 调用 LLM，可用工具: ${toolSchemas.length} 个`);
 
-      // 7. LLM function-calling 调用（传入 signal，可被取消）
-      const toolCalls = await this.llmManager.callTool(context.userPrompt, toolSchemas, context.systemPrompt, { signal });
+      messages = this.buildMessages(context.systemPrompt, context.userPrompt);
+
+      const toolCalls = await this.llmManager.callToolWithHistory(messages, toolSchemas, { signal });
 
       if (!toolCalls || toolCalls.length === 0) {
-        // LLM 没有调用工具，可能是思考或结束
-        this.logger.debug('LLM 没有调用工具');
+        this.logger.warn('⚠️ LLM 没有调用任何工具！');
+        await this.historyLogger.logLLMCall(this.loopCount, messages, [], []);
         await this.sleep(500);
         return;
       }
 
-      // 8. 执行所有工具调用
+      this.logger.info(`✅ LLM 返回 ${toolCalls.length} 个工具调用`);
+
+      this.conversationHistory.push({
+        role: 'assistant',
+        content: '[调用工具]',
+        tool_calls: toolCalls,
+      });
+
       for (const toolCall of toolCalls) {
         signal.throwIfAborted();
-        await this.executeToolCall(toolCall);
+        const result = await this.executeToolCallWithResult(toolCall);
+        toolResults.push(result);
       }
 
-      // 9. 自适应延迟
+      await this.historyLogger.logLLMCall(this.loopCount, messages, toolCalls, toolResults);
+
+      this.trimHistory();
+
       await this.adaptiveSleep();
     } catch (error) {
       if (error instanceof CancellationError) {
@@ -94,40 +107,99 @@ export class AgentLoop extends BaseLoop<AgentState> {
   }
 
   /**
-   * 执行单个工具调用
+   * 构建消息列表
+   * 结构：[system, user(最新状态), ...history(assistant+tool对话链)]
    */
+  private buildMessages(
+    systemPrompt: string,
+    userPrompt: string,
+  ): Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }> {
+    const messages: Array<{ role: string; content: string; tool_calls?: any[]; tool_call_id?: string; name?: string }> = [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ];
+
+    messages.push(...this.conversationHistory);
+
+    return messages;
+  }
+
   private async executeToolCall(toolCall: ToolCall): Promise<void> {
+    const result = await this.executeToolCallWithResult(toolCall);
+    this.logger.info(
+      `${result.success ? '✅' : '❌'} 工具执行${result.success ? '成功' : '失败'}: ${result.result?.message || result.result?.error || ''}`,
+    );
+  }
+
+  private async executeToolCallWithResult(toolCall: ToolCall): Promise<{ toolCallId: string; name: string; success: boolean; result: any }> {
     const toolName = toolCall.function.name;
     let args: Record<string, any> = {};
 
     try {
-      // 解析参数
       args = JSON.parse(toolCall.function.arguments);
     } catch (e) {
       this.logger.error(`❌ 解析工具参数失败: ${toolName}`, undefined, e as Error);
       this.state.memory.recordDecision(`调用工具 ${toolName}`, { toolName, rawArgs: toolCall.function.arguments }, 'failed', '参数解析失败');
-      return;
+
+      const errorResult = { success: false, error: '参数解析失败' };
+      this.conversationHistory.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: toolName,
+        content: JSON.stringify(errorResult),
+      });
+
+      return { toolCallId: toolCall.id, name: toolName, success: false, result: errorResult };
     }
 
     this.logger.info(`🔧 执行工具: ${toolName}`, args);
 
     try {
-      // 执行工具
       const result = await this.toolRegistry.executeTool(toolName, args);
 
-      // 记录决策
       this.state.memory.recordDecision(`执行 ${toolName}`, { toolName, args }, result.success ? 'success' : 'failed', result.message);
 
-      this.logger.info(`${result.success ? '✅' : '❌'} 工具执行${result.success ? '成功' : '失败'}: ${result.message}`);
+      const toolResult = {
+        success: result.success,
+        message: result.message,
+        data: result.data,
+      };
+
+      this.conversationHistory.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: toolName,
+        content: JSON.stringify(toolResult),
+      });
+
+      return { toolCallId: toolCall.id, name: toolName, success: result.success, result: toolResult };
     } catch (error) {
       this.logger.error(`❌ 工具执行异常: ${toolName}`, undefined, error as Error);
       this.state.memory.recordDecision(`执行 ${toolName}`, { toolName, args }, 'failed', `执行异常: ${(error as Error).message}`);
+
+      const errorResult = { success: false, error: (error as Error).message };
+      this.conversationHistory.push({
+        role: 'tool',
+        tool_call_id: toolCall.id,
+        name: toolName,
+        content: JSON.stringify(errorResult),
+      });
+
+      return { toolCallId: toolCall.id, name: toolName, success: false, result: errorResult };
     }
   }
 
-  /**
-   * 检查目标完成
-   */
+  private trimHistory(): void {
+    const maxMessages = this.maxHistoryTurns * 2;
+    if (this.conversationHistory.length > maxMessages) {
+      this.conversationHistory = this.conversationHistory.slice(-maxMessages);
+    }
+  }
+
+  resetHistory(): void {
+    this.conversationHistory = [];
+  }
+
   private async checkGoalAndTaskCompletion(): Promise<void> {
     try {
       const goalManager = this.state.context.goalManager;
@@ -143,14 +215,9 @@ export class AgentLoop extends BaseLoop<AgentState> {
     }
   }
 
-  /**
-   * 自适应延迟
-   */
   private async adaptiveSleep(): Promise<void> {
-    // 基础延迟
     let delay = 500;
 
-    // 如果生命值低，更快响应
     if (this.state.context.gameState.health < 10) {
       delay = 200;
     }
@@ -158,9 +225,6 @@ export class AgentLoop extends BaseLoop<AgentState> {
     await this.sleep(delay);
   }
 
-  /**
-   * 获取循环计数
-   */
   getLoopCount(): number {
     return this.loopCount;
   }

@@ -407,6 +407,8 @@ export const LLMRequestConfigSchema = z.object({
   stop: z.union([z.string(), z.array(z.string())]).optional(),
   stream: z.boolean().optional().default(false),
   signal: z.any().optional(),
+  tools: z.any().optional(),
+  tool_choice: z.any().optional(),
 });
 
 // 导出类型

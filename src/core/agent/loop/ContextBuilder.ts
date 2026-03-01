@@ -63,16 +63,30 @@ export class ContextBuilder {
       parts.push('\n⚠️ 警告：你的饥饿值很低，请尽快进食！');
     }
 
-    // 有目标但无任务的提示
-    if (this.hasGoalButNoPlan()) {
-      parts.push('\n💡 提示：你有目标但没有执行计划，考虑使用 plan_action 工具的 update_plan 操作来制定计划。');
+    if (this.recentlyFailedToFindBlock()) {
+      parts.push('\n💡 提示：你刚才找不到目标方块，请**立即调用移动工具**（如 move）去更远的地方探索寻找！');
+    }
+
+    if (this.hasGoalButOnlyPlanning()) {
+      parts.push('\n⚠️ 警告：你一直在更新计划，但从未执行实际动作！请**立即停止制定计划**，直接调用 find_block、move、mine_block 等工具执行任务！');
     }
 
     return parts.join('\n');
   }
 
+  private hasGoalButOnlyPlanning(): boolean {
+    const recentDecisions = this.state.memory.decision.getRecent(3);
+    if (recentDecisions.length < 3) return false;
+
+    const allPlanning = recentDecisions.every(d => d.intention.includes('plan_action'));
+    return allPlanning;
+  }
+
   /**
    * 构建 user prompt（环境观察）
+   *
+   * 注意：使用 Function Calling 时，工具 schema 通过 tools 参数传递，
+   * 不需要在 prompt 里重复。这里只提供环境状态和上下文信息。
    */
   buildUserPrompt(): string {
     // 复用 PromptDataCollector 收集环境数据
@@ -84,6 +98,15 @@ export class ContextBuilder {
     // 当前状态
     parts.push('## 当前环境观察\n');
     parts.push(this.formatBasicInfo(allData.baseInfo));
+
+    if (allData.actionData.eat_action) {
+      parts.push('\n### ⚠️ 饥饿警告\n');
+      parts.push('你的饥饿值较低，请考虑使用 eat 工具进食。');
+    }
+    if (allData.actionData.kill_mob_action) {
+      parts.push('\n### ⚠️ 敌对生物警告\n');
+      parts.push('附近有敌对生物，请考虑使用 kill_mob 工具或 move 工具逃离。');
+    }
 
     // 最近的聊天记录
     parts.push('\n## 最近聊天\n');
@@ -106,16 +129,25 @@ export class ContextBuilder {
 
   /**
    * 获取基础 system prompt
+   *
+   * 明确指示 LLM 优先使用工具而非纯文本回复
    */
   private getBaseSystemPrompt(): string {
-    return `你是一个 Minecraft 游戏助手。你可以使用工具来与世界交互。
+    return `你是一个 Minecraft 游戏AI助手。通过**调用工具**与世界交互并完成任务。
 
-核心原则：
-1. 安全第一：生命值低时优先躲避或治疗
-2. 效率优先：选择最优路径和方法
-3. 计划先行：复杂目标需要先规划任务
+## 核心规则
 
-你可以使用多种工具来完成任务。每次调用工具后，你会看到执行结果，然后可以决定下一步行动。`;
+1. **先思考后行动**：每次回复先用简短的一句话说明你的分析和决策，然后调用工具。
+2. **持续行动**：每轮必须调用至少一个工具推进任务。
+3. **安全第一**：生命值低时优先躲避或治疗。
+4. **探索策略**：找不到资源时立即移动探索，不要重复相同的查找。
+
+## 回复格式示例
+
+思考：附近16格内没有橡木，需要向远处探索。
+[调用 move 工具]
+
+记住：思考 + 行动！`;
   }
 
   // 辅助方法
@@ -128,11 +160,9 @@ export class ContextBuilder {
     return gameState.food / gameState.foodMax < 0.3;
   }
 
-  private hasGoalButNoPlan(): boolean {
-    const goalManager = this.state.context.goalManager;
-    const currentGoal = goalManager?.getCurrentGoal();
-    if (!currentGoal) return false;
-    return !currentGoal.plan;
+  private recentlyFailedToFindBlock(): boolean {
+    const recentDecisions = this.state.memory.decision.getRecent(3);
+    return recentDecisions.some(d => d.intention.includes('find_block') && d.result === 'failed');
   }
 
   private formatBasicInfo(baseInfo: any): string {

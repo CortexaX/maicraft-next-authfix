@@ -69,24 +69,30 @@ export class OpenAIProvider implements ILLMProvider {
           options.signal = validatedConfig.signal;
         }
 
-        const completion = await this.client.chat.completions.create(
-          {
-            model: validatedConfig.model,
-            messages: validatedConfig.messages.map(msg => ({
-              role: msg.role as 'system' | 'user' | 'assistant',
-              content: msg.content,
-              name: msg.name,
-            })),
-            max_tokens: validatedConfig.max_tokens,
-            temperature: validatedConfig.temperature,
-            top_p: validatedConfig.top_p,
-            frequency_penalty: validatedConfig.frequency_penalty,
-            presence_penalty: validatedConfig.presence_penalty,
-            stop: validatedConfig.stop,
-            stream: false,
-          },
-          options,
-        );
+        const requestParams: any = {
+          model: validatedConfig.model,
+          messages: validatedConfig.messages.map(msg => ({
+            role: msg.role as 'system' | 'user' | 'assistant',
+            content: msg.content,
+            name: msg.name,
+          })),
+          max_tokens: validatedConfig.max_tokens,
+          temperature: validatedConfig.temperature,
+          top_p: validatedConfig.top_p,
+          frequency_penalty: validatedConfig.frequency_penalty,
+          presence_penalty: validatedConfig.presence_penalty,
+          stop: validatedConfig.stop,
+          stream: false,
+        };
+
+        if (validatedConfig.tools) {
+          requestParams.tools = validatedConfig.tools;
+        }
+        if (validatedConfig.tool_choice) {
+          requestParams.tool_choice = validatedConfig.tool_choice;
+        }
+
+        const completion = await this.client.chat.completions.create(requestParams, options);
 
         // 转换响应格式
         const response: LLMResponse = {
@@ -99,6 +105,7 @@ export class OpenAIProvider implements ILLMProvider {
             message: {
               role: choice.message.role as any,
               content: choice.message.content || '',
+              tool_calls: choice.message.tool_calls,
             },
             finish_reason: choice.finish_reason || 'stop',
             logprobs: choice.logprobs as any,
@@ -279,6 +286,8 @@ export class OpenAIProvider implements ILLMProvider {
       stop: config.stop,
       stream: config.stream ?? false,
       signal: config.signal,
+      tools: config.tools,
+      tool_choice: config.tool_choice,
     };
 
     return this.validateWithSchema(mergedConfig);
@@ -307,6 +316,8 @@ export class OpenAIProvider implements ILLMProvider {
       stop: z.union([z.string(), z.array(z.string())]).optional(),
       stream: z.boolean().default(false),
       signal: z.any().optional(),
+      tools: z.any().optional(),
+      tool_choice: z.any().optional(),
     });
 
     return schema.parse(config) as ValidatedLLMRequestConfig;

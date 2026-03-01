@@ -178,9 +178,11 @@ export class ToolRegistry {
     for (const [key, value] of Object.entries(actionSchema)) {
       // 确保每个属性有 type 字段
       if (typeof value === 'object' && value !== null) {
+        // 复制属性，但排除非标准 JSON Schema 字段
+        const { required: _required, optional: _optional, ...rest } = value; // eslint-disable-line @typescript-eslint/no-unused-vars
         properties[key] = {
           type: value.type || 'string',
-          ...value,
+          ...rest,
         };
 
         // 检查是否为必需参数
