@@ -29,6 +29,7 @@ import type { WebSocketServer } from '@/api/WebSocketServer';
 import { type AppConfig } from '@/utils/Config';
 import { createLogger, LogLevel, type Logger } from '@/utils/Logger';
 import { ConfigLoader } from '@/utils/Config';
+import { applyXboxLiveLoginPagePatch } from '@/auth/patchXboxLiveAuth';
 
 /**
  * 基础错误日志记录器（在配置加载前使用）
@@ -122,6 +123,12 @@ class MaicraftNext {
       port: mcConfig.port,
       username: mcConfig.username,
     });
+
+    // 微软账号密码登录页面兼容补丁（仅替换网页参数解析阶段）
+    if (mcConfig.auth === 'microsoft' && mcConfig.password) {
+      applyXboxLiveLoginPagePatch();
+      this.logger.info('已应用微软登录页面兼容补丁');
+    }
 
     // 创建bot
     this.bot = createBot({
