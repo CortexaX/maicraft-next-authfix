@@ -66,6 +66,70 @@ async function robustPreAuth(baseHeaders: Record<string, string>, authorizeUrl: 
   };
 }
 
+async function hardcodedLogUser(credentials: { email: string; password: string }, baseHeaders: Record<string, string>): Promise<any> {
+  // 按“硬写页面参数”方式走一遍（固定 PPFT + 固定 post.srf 参数）
+  // 这是兼容层：优先尝试硬写，失败再回退到通用解析。
+  const fixedPostUrl =
+    'https://login.live.com/ppsecure/post.srf?id=74335&contextid=234014DB41B61525&opid=1956E33996A4C9C4&bk=1714743335&uaid=fc6b7450f145408fb5ec025d4dd0cecd&pid=0';
+
+  const form = new URLSearchParams({
+    ps: '2',
+    psRNGCDefaultType: '',
+    psRNGCEntropy: '',
+    psRNGCSLK: '',
+    canary: '',
+    ctx: '',
+    hpgrequestid: '',
+    PPFT:
+      '-DqrJf42zHrBGKJDrPFYIVqLmGmWJW7fcEZw*qF2uHRLgKfvHI4kF942GFl6AYz2MHhcwhEzUBsvd2SoHnRvfJFO0daLHDg5VKkr6sj*zFQX24i1Kq2CB2ikUrZvWVrA862xff8C1Zj7BN59FIyODz5GEIVk1gtmgAxeKF17q!bFnBhwufbUqGhdFbPLLW8A8bMRrFweSUeViPum2S6DZhVo$',
+    PPSX: 'PassportRN',
+    NewUser: '1',
+    FoundMSAs: '',
+    fspost: '0',
+    i21: '0',
+    CookieDisclosure: '0',
+    IsFidoSupported: '1',
+    isSignupPost: '0',
+    isRecoveryAttemptPost: '0',
+    i13: '0',
+    login: credentials.email,
+    loginfmt: credentials.email,
+    type: '11',
+    LoginOptions: '3',
+    lrt: '',
+    lrtPartition: '',
+    hisRegion: '',
+    hisScaleUnit: '',
+    passwd: credentials.password,
+  });
+
+  const resp = await fetch(fixedPostUrl, {
+    method: 'POST',
+    redirect: 'manual',
+    headers: {
+      ...baseHeaders,
+      'Content-Type': 'application/x-www-form-urlencoded',
+    },
+    body: form.toString(),
+  });
+
+  const location = resp.headers.get('location') || '';
+  if (location.includes('#access_token=')) return parseHashFragment(location);
+
+  const body = await resp.text();
+  const inlineRedirect = firstMatch(body, [
+    /window\.location\.href\s*=\s*"([^"]+)"/i,
+    /window\.location\.replace\("([^"]+)"\)/i,
+    /document\.location\s*=\s*'([^']+)'/i,
+  ]);
+
+  if (inlineRedirect && inlineRedirect.includes('#access_token=')) {
+    return parseHashFragment(decodeHtml(inlineRedirect));
+  }
+
+  throw new Error('Hardcoded login flow did not return access token');
+}
+
 async function robustLogUser(preAuthResponse: any, credentials: { email: string; password: string }, baseHeaders: Record<string, string>): Promise<any> {
   const form = new URLSearchParams({
     login: credentials.email,
@@ -126,8 +190,13 @@ export function applyXboxLiveLoginPagePatch(): void {
   const baseHeaders = rootConfig.request.baseHeaders as Record<string, string>;
 
   const preAuthPatched = () => robustPreAuth(baseHeaders, authorizeUrl);
-  const logUserPatched = (preAuthResponse: any, credentials: { email: string; password: string }) =>
-    robustLogUser(preAuthResponse, credentials, baseHeaders);
+  const logUserPatched = async (preAuthResponse: any, credentials: { email: string; password: string }) => {
+    try {
+      return await hardcodedLogUser(credentials, baseHeaders);
+    } catch {
+      return robustLogUser(preAuthResponse, credentials, baseHeaders);
+    }
+  };
 
   XboxLiveAuth.preAuth = preAuthPatched;
   XboxLiveAuth.logUser = logUserPatched;
