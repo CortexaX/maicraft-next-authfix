@@ -137,7 +137,7 @@ class MaicraftNext {
     };
 
     if (mcConfig.auth === 'microsoft') {
-      botOptions.pythonAuthScript = process.env.MAICRAFT_PY_AUTH_SCRIPT || path.join(process.cwd(), 'scripts', 'ms_mc_auth.py');
+      botOptions.pythonAuthScript = process.env.MAICRAFT_PY_AUTH_SCRIPT || path.join(process.cwd(), 'src', 'auth', 'ms_mc_auth.py');
       botOptions.pythonBin = process.env.MAICRAFT_PY_BIN || 'python3';
       this.logger.info('微软登录已切换为 Python 脚本认证', { pythonAuthScript: botOptions.pythonAuthScript, pythonBin: botOptions.pythonBin });
     }
